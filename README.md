@@ -18,7 +18,7 @@
 - Node.js
 - JDK
 - Maven
-- Windows 环境下可直接使用 `start-codex-monitor.cmd`
+- Windows 环境下可直接使用 `start-project-env-launcher.cmd`
 
 Maven 可以来自系统 `PATH`，也可以来自项目自身的 Maven Wrapper。启动模块时，系统会优先使用可检测到的 Maven 命令。
 
@@ -44,7 +44,7 @@ npm start
 也可以在 Windows 上双击：
 
 ```text
-start-codex-monitor.cmd
+start-project-env-launcher.cmd
 ```
 
 脚本会先构建前端，再启动后端服务，并自动打开：
@@ -84,4 +84,3 @@ server/data/runtime-configs/.gitkeep
 当前版本：[v0.1.0](https://github.com/scottzzj/project-env-launcher/releases/tag/v0.1.0)
 
 预览页单独发布在公开仓库，只包含静态页面，不包含源码和本地运行数据。
-
