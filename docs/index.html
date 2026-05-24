@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>项目管理页面预览 | Project Env Launcher</title>
+    <title>Project Env Launcher Preview</title>
     <style>
       :root {
         color-scheme: dark;
         font-family:
           Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
           "Segoe UI", "Microsoft YaHei", sans-serif;
-        color: #edf6ff;
+        color: #eef6ff;
         background: #071018;
       }
 
@@ -23,18 +23,15 @@
         min-height: 100vh;
         margin: 0;
         background:
-          radial-gradient(circle at 16% 0%, rgba(14, 165, 233, 0.2), transparent 27rem),
-          radial-gradient(circle at 92% 24%, rgba(16, 185, 129, 0.14), transparent 24rem),
+          radial-gradient(circle at 16% 0%, rgba(14, 165, 233, 0.18), transparent 24rem),
+          radial-gradient(circle at 90% 18%, rgba(34, 197, 94, 0.1), transparent 22rem),
           linear-gradient(135deg, #07111b 0%, #0a151d 48%, #02060b 100%);
       }
 
       button,
-      input {
+      input,
+      select {
         font: inherit;
-      }
-
-      a {
-        color: inherit;
       }
 
       .page {
@@ -45,116 +42,143 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 24px;
-        max-width: 1240px;
+        gap: 16px;
+        max-width: 1320px;
         margin: 0 auto;
-        padding: 20px 24px;
+        padding: 18px 24px 12px;
       }
 
       .brand {
         display: flex;
         align-items: center;
-        gap: 12px;
-        color: #e6f5ff;
-        font-weight: 800;
+        gap: 10px;
+        color: #e8f5ff;
+        font-weight: 900;
       }
 
       .brand-mark {
         display: grid;
-        width: 34px;
-        height: 34px;
+        width: 32px;
+        height: 32px;
         place-items: center;
-        border: 1px solid rgba(125, 211, 252, 0.26);
+        border: 1px solid rgba(125, 211, 252, 0.28);
         border-radius: 8px;
-        background: rgba(15, 23, 42, 0.7);
+        background: rgba(15, 23, 42, 0.74);
         color: #8bd8ff;
+        font-size: 13px;
       }
 
       .repo-link {
-        padding: 9px 13px;
+        padding: 8px 12px;
         border: 1px solid rgba(148, 163, 184, 0.24);
         border-radius: 8px;
         color: #d8e9fb;
         text-decoration: none;
         background: rgba(8, 17, 28, 0.68);
+        font-size: 13px;
+        font-weight: 800;
       }
 
       .hero {
-        display: grid;
-        grid-template-columns: minmax(0, 0.85fr) minmax(560px, 1.15fr);
-        gap: 34px;
-        max-width: 1240px;
+        max-width: 1320px;
         margin: 0 auto;
-        padding: 46px 24px 34px;
-        align-items: center;
+        padding: 18px 24px 10px;
+      }
+
+      .hero-row {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+        align-items: start;
       }
 
       .eyebrow {
-        margin: 0 0 14px;
+        margin: 0 0 8px;
         color: #7dd3fc;
-        font-size: 14px;
-        font-weight: 800;
+        font-size: 13px;
+        font-weight: 900;
       }
 
       h1 {
         margin: 0;
+        max-width: 900px;
         color: #f8fbff;
-        font-size: clamp(40px, 6vw, 70px);
-        line-height: 1;
+        font-size: clamp(24px, 2.7vw, 32px);
+        line-height: 1.18;
         letter-spacing: 0;
+        white-space: nowrap;
       }
 
       .lead {
-        margin: 22px 0 0;
-        color: #b8c8da;
-        font-size: 18px;
-        line-height: 1.7;
+        margin: 12px 0 0;
+        max-width: 880px;
+        color: #aec1d4;
+        font-size: 14px;
+        line-height: 1.62;
       }
 
-      .actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        margin-top: 28px;
+      .stat-strip {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        max-width: 620px;
       }
 
-      .button {
-        display: inline-flex;
-        min-height: 42px;
-        align-items: center;
-        justify-content: center;
-        padding: 0 16px;
+      .stat {
+        min-height: 74px;
+        padding: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.16);
         border-radius: 8px;
-        font-weight: 800;
-        text-decoration: none;
+        background: rgba(9, 19, 31, 0.72);
       }
 
-      .button.primary {
-        color: #03111f;
-        background: #7dd3fc;
+      .stat strong {
+        display: block;
+        color: #f4f8ff;
+        font-size: 20px;
       }
 
-      .button.secondary {
-        border: 1px solid rgba(148, 163, 184, 0.28);
-        color: #e8f3ff;
-        background: rgba(15, 23, 42, 0.68);
+      .stat span {
+        color: #91a6bc;
+        font-size: 12px;
       }
 
-      .preview-shell {
+      .gallery {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+        max-width: 1320px;
+        margin: 0 auto;
+        padding: 20px 24px 34px;
+      }
+
+      .shot {
         overflow: hidden;
-        border: 1px solid rgba(148, 163, 184, 0.18);
+        min-height: 390px;
+        border: 1px solid rgba(148, 163, 184, 0.16);
         border-radius: 8px;
         background: rgba(4, 10, 18, 0.9);
-        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
       }
 
-      .window-bar {
+      .shot.wide {
+        grid-column: 1 / -1;
+      }
+
+      .shot-head {
         display: flex;
         align-items: center;
-        gap: 7px;
-        height: 38px;
-        padding: 0 13px;
+        justify-content: space-between;
+        gap: 12px;
+        height: 42px;
+        padding: 0 14px;
         border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+        background: rgba(3, 10, 18, 0.72);
+      }
+
+      .window-dots {
+        display: flex;
+        gap: 7px;
       }
 
       .dot {
@@ -163,130 +187,313 @@
         border-radius: 999px;
       }
 
-      .dot.red {
+      .red {
         background: #fb7185;
       }
 
-      .dot.yellow {
+      .yellow {
         background: #facc15;
       }
 
-      .dot.green {
+      .green {
         background: #34d399;
       }
 
-      .app-preview {
-        display: grid;
-        grid-template-columns: 78px minmax(0, 1fr);
-        min-height: 430px;
+      .shot-title {
+        color: #dbeafe;
+        font-size: 13px;
+        font-weight: 900;
       }
 
-      .side {
-        border-right: 1px solid rgba(148, 163, 184, 0.12);
-        background: rgba(3, 10, 18, 0.8);
+      .shot-body {
+        display: grid;
+        grid-template-columns: 76px minmax(0, 1fr);
+        min-height: 348px;
+      }
+
+      .nav {
+        display: grid;
+        align-content: start;
+        gap: 8px;
         padding: 12px 8px;
+        border-right: 1px solid rgba(148, 163, 184, 0.12);
+        background: rgba(3, 10, 18, 0.78);
       }
 
-      .nav-pill {
+      .nav-item {
         display: grid;
-        min-height: 62px;
+        min-height: 52px;
         place-items: center;
         gap: 5px;
-        margin-bottom: 8px;
         border-radius: 8px;
-        color: #95a7ba;
+        color: #91a6bc;
         font-size: 12px;
         font-weight: 800;
       }
 
-      .nav-pill.active {
-        color: #8bd8ff;
+      .nav-item.active {
+        color: #7dd3fc;
         border: 1px solid rgba(125, 211, 252, 0.2);
         background: rgba(14, 165, 233, 0.1);
       }
 
       .nav-icon {
-        width: 18px;
-        height: 18px;
+        width: 17px;
+        height: 17px;
         border: 2px solid currentColor;
         border-radius: 5px;
       }
 
-      .content {
-        padding: 22px;
+      .canvas {
+        padding: 16px;
       }
 
-      .content-head {
+      .panel-head {
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
-        gap: 18px;
-        margin-bottom: 18px;
+        gap: 14px;
+        margin-bottom: 14px;
       }
 
-      .content-head h2 {
-        margin: 0 0 8px;
-        font-size: 24px;
+      .panel-head h2 {
+        margin: 0 0 5px;
+        color: #f4f8ff;
+        font-size: 20px;
       }
 
-      .content-head p {
+      .panel-head p {
         margin: 0;
-        color: #9fb1c7;
-        line-height: 1.55;
+        color: #8ea2b8;
+        font-size: 13px;
       }
 
-      .small-btn {
-        min-width: 92px;
-        min-height: 36px;
-        border: 0;
+      .button-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .btn {
+        min-height: 32px;
+        padding: 0 11px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
         border-radius: 8px;
+        color: #d8e9fb;
+        background: rgba(15, 23, 42, 0.58);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .btn.primary {
+        border-color: transparent;
         color: #03111f;
         background: #7dd3fc;
-        font-weight: 800;
       }
 
       .toolbar {
         display: grid;
-        grid-template-columns: minmax(180px, 1fr) repeat(2, 106px);
-        gap: 10px;
-        margin-bottom: 14px;
+        grid-template-columns: minmax(180px, 1fr) repeat(2, 100px);
+        gap: 9px;
+        margin-bottom: 12px;
       }
 
       .field,
-      .ghost-btn {
-        min-height: 38px;
+      .select {
+        min-height: 36px;
+        padding: 0 11px;
         border: 1px solid rgba(148, 163, 184, 0.18);
         border-radius: 8px;
         color: #d8e9fb;
         background: rgba(15, 23, 42, 0.62);
       }
 
-      .field {
-        padding: 0 12px;
-      }
-
-      .ghost-btn {
-        font-weight: 800;
-      }
-
-      .project-list {
+      .status-layout {
         display: grid;
-        gap: 10px;
-      }
-
-      .project-row {
-        display: grid;
-        grid-template-columns: 42px minmax(0, 1fr) 88px 88px;
+        grid-template-columns: minmax(260px, 0.38fr) minmax(0, 1fr);
         gap: 12px;
-        align-items: center;
-        min-height: 74px;
-        padding: 13px;
+      }
+
+      .status-board,
+      .detail-pane,
+      .mini-card,
+      .config-pane {
         border: 1px solid rgba(148, 163, 184, 0.14);
         border-radius: 8px;
         background: rgba(9, 19, 31, 0.68);
       }
 
-      .folder {
+      .status-board {
+        display: grid;
+        gap: 9px;
+        align-content: start;
+        padding: 12px;
+      }
+
+      .project-state {
+        padding: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.13);
+        border-radius: 8px;
+        background: rgba(5, 14, 24, 0.72);
+      }
+
+      .row-between,
+      .module-head,
+      .log-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .project-name,
+      .module-name {
+        color: #f4f8ff;
+        font-weight: 900;
+      }
+
+      .state-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+        color: #a9bbcf;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .state-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #64748b;
+      }
+
+      .state-dot.running {
+        background: #22c55e;
+        box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.1);
+      }
+
+      .state-dot.starting {
+        background: #facc15;
+        box-shadow: 0 0 0 5px rgba(250, 204, 21, 0.1);
+      }
+
+      .state-dot.failed {
+        background: #fb7185;
+        box-shadow: 0 0 0 5px rgba(251, 113, 133, 0.1);
+      }
+
+      .module-lines {
+        display: grid;
+        gap: 7px;
+        margin: 12px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .module-lines li {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        color: #b8c8da;
+        font-size: 13px;
+      }
+
+      .detail-pane {
+        padding: 13px;
+      }
+
+      .env-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .env-tab {
+        min-height: 30px;
+        padding: 0 12px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 999px;
+        color: #a9bbcf;
+        background: rgba(15, 23, 42, 0.6);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .env-tab.active {
+        color: #03111f;
+        border-color: transparent;
+        background: #7dd3fc;
+      }
+
+      .module-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .module-card {
+        min-height: 84px;
+        padding: 10px;
+        border: 1px solid rgba(148, 163, 184, 0.13);
+        border-radius: 8px;
+        background: rgba(5, 14, 24, 0.72);
+      }
+
+      .module-port,
+      .path,
+      .muted {
+        color: #91a6bc;
+        font-size: 13px;
+      }
+
+      .module-port {
+        margin-top: 9px;
+      }
+
+      .log-panel {
+        margin-top: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        border-radius: 8px;
+        background: rgba(3, 7, 13, 0.82);
+      }
+
+      .log-title {
+        padding: 9px 11px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+        color: #d8e9fb;
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .log-lines {
+        margin: 0;
+        padding: 11px;
+        overflow-x: auto;
+        color: #c7d9ea;
+        font: 12px/1.7 "Cascadia Mono", Consolas, monospace;
+      }
+
+      .list {
+        display: grid;
+        gap: 9px;
+      }
+
+      .list-row {
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr) auto auto;
+        gap: 11px;
+        align-items: center;
+        min-height: 64px;
+        padding: 10px;
+        border: 1px solid rgba(148, 163, 184, 0.13);
+        border-radius: 8px;
+        background: rgba(9, 19, 31, 0.68);
+      }
+
+      .icon-box {
         display: grid;
         width: 42px;
         height: 42px;
@@ -294,32 +501,19 @@
         border-radius: 8px;
         color: #7dd3fc;
         background: rgba(14, 165, 233, 0.12);
-      }
-
-      .folder::before {
-        width: 22px;
-        height: 16px;
-        border: 2px solid currentColor;
-        border-radius: 4px;
-        content: "";
-      }
-
-      .row-title {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 5px;
-        color: #f4f8ff;
         font-weight: 900;
       }
 
       .tag {
-        padding: 3px 7px;
+        display: inline-flex;
+        align-items: center;
+        min-height: 22px;
+        padding: 0 7px;
         border-radius: 999px;
         color: #a7f3d0;
         background: rgba(16, 185, 129, 0.12);
         font-size: 12px;
+        font-weight: 800;
       }
 
       .tag.warn {
@@ -327,127 +521,109 @@
         background: rgba(250, 204, 21, 0.12);
       }
 
-      .row-path {
-        display: block;
-        overflow: hidden;
-        color: #8ea2b8;
-        font-size: 13px;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .outline-btn {
-        min-height: 34px;
-        border: 1px solid rgba(148, 163, 184, 0.22);
-        border-radius: 8px;
-        color: #d8e9fb;
-        background: rgba(15, 23, 42, 0.55);
-        font-weight: 800;
-      }
-
-      .outline-btn.danger {
-        color: #fecdd3;
-        border-color: rgba(251, 113, 133, 0.32);
-      }
-
-      .section {
-        max-width: 1240px;
-        margin: 0 auto;
-        padding: 34px 24px;
-      }
-
-      .section h2 {
-        margin: 0 0 18px;
-        color: #f7fbff;
-        font-size: 28px;
-      }
-
-      .grid {
+      .card-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 14px;
+        gap: 10px;
       }
 
-      .card {
-        min-height: 164px;
-        padding: 20px;
-        border: 1px solid rgba(148, 163, 184, 0.16);
-        border-radius: 8px;
-        background: rgba(9, 19, 31, 0.72);
+      .mini-card {
+        min-height: 116px;
+        padding: 13px;
       }
 
-      .card h3 {
-        margin: 0 0 10px;
-        color: #eef6ff;
-        font-size: 18px;
+      .mini-card h3 {
+        margin: 0 0 9px;
+        color: #f4f8ff;
+        font-size: 16px;
       }
 
-      .card p,
-      .note,
-      .release-list li {
-        margin: 0;
-        color: #a9bbcf;
-        line-height: 1.68;
-      }
-
-      .release-panel {
+      .config-layout {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(320px, 0.55fr);
-        gap: 14px;
+        grid-template-columns: 220px minmax(0, 1fr);
+        gap: 12px;
       }
 
-      .release-list {
-        margin: 0;
-        padding-left: 18px;
+      .config-side {
+        display: grid;
+        gap: 9px;
       }
 
-      .code-box {
-        margin: 0;
-        padding: 18px;
-        overflow-x: auto;
-        border: 1px solid rgba(148, 163, 184, 0.16);
+      .config-pane {
+        padding: 13px;
+      }
+
+      .config-group {
+        margin-bottom: 12px;
+        padding: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.12);
         border-radius: 8px;
-        background: rgba(3, 7, 13, 0.82);
-        color: #d5e7f8;
-        font: 14px/1.75 "Cascadia Mono", Consolas, monospace;
+        background: rgba(5, 14, 24, 0.66);
+      }
+
+      .config-group h3 {
+        margin: 0 0 10px;
+        color: #f4f8ff;
+        font-size: 15px;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 9px;
+      }
+
+      .field-label {
+        display: grid;
+        gap: 6px;
+        color: #8ea2b8;
+        font-size: 12px;
       }
 
       .footer {
-        max-width: 1240px;
+        max-width: 1320px;
         margin: 0 auto;
-        padding: 28px 24px 42px;
+        padding: 0 24px 34px;
         color: #8293a8;
+        font-size: 13px;
       }
 
       @media (max-width: 980px) {
-        .hero,
-        .release-panel {
+        .hero-row,
+        .gallery,
+        .status-layout,
+        .config-layout {
           grid-template-columns: 1fr;
         }
 
-        .grid {
+        h1 {
+          white-space: normal;
+        }
+
+        .shot.wide {
+          grid-column: auto;
+        }
+
+        .shot-body {
           grid-template-columns: 1fr;
         }
 
-        .app-preview {
-          grid-template-columns: 1fr;
-        }
-
-        .side {
+        .nav {
           display: flex;
-          gap: 8px;
           overflow-x: auto;
           border-right: 0;
           border-bottom: 1px solid rgba(148, 163, 184, 0.12);
         }
 
-        .nav-pill {
-          min-width: 72px;
-          margin-bottom: 0;
+        .nav-item {
+          min-width: 70px;
         }
 
         .toolbar,
-        .project-row {
+        .list-row,
+        .module-grid,
+        .card-grid,
+        .form-grid {
           grid-template-columns: 1fr;
         }
       }
@@ -464,119 +640,221 @@
       </header>
 
       <section class="hero">
-        <div>
-          <p class="eyebrow">项目管理页面预览</p>
-          <h1>把本机项目路径和可启动模块管清楚</h1>
-          <p class="lead">
-            项目页面负责维护本机项目入口：手工添加项目目录，编辑项目名称和路径，刷新模块识别结果，并为后续环境配置与模块启动提供真实数据基础。
-          </p>
-          <div class="actions">
-            <a class="button primary" href="https://scottzzj.github.io/project-env-launcher-preview/">打开预览</a>
-            <a class="button secondary" href="https://github.com/scottzzj/project-env-launcher">查看源码</a>
+        <div class="hero-row">
+          <div>
+            <p class="eyebrow">项目环境启动台 · 页面预览</p>
+            <h1>项目环境启动管理台</h1>
+            <p class="lead">下面是静态预览图，使用通用 mock 数据展示页面效果。真实系统运行时，数据来自本机 SQLite、项目扫描和本地 Java 进程。</p>
+          </div>
+          <div class="stat-strip">
+            <div class="stat"><strong>5</strong><span>核心页面</span></div>
+            <div class="stat"><strong>1</strong><span>本地数据库</span></div>
+            <div class="stat"><strong>0</strong><span>内置业务数据</span></div>
           </div>
         </div>
+      </section>
 
-        <div class="preview-shell" aria-label="项目管理页面示意">
-          <div class="window-bar">
-            <span class="dot red"></span>
-            <span class="dot yellow"></span>
-            <span class="dot green"></span>
+      <section class="gallery">
+        <article class="shot wide">
+          <div class="shot-head">
+            <div class="window-dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+            <span class="shot-title">监控面板</span>
           </div>
-          <div class="app-preview">
-            <aside class="side">
-              <div class="nav-pill"><span class="nav-icon"></span><span>监控</span></div>
-              <div class="nav-pill active"><span class="nav-icon"></span><span>项目</span></div>
-              <div class="nav-pill"><span class="nav-icon"></span><span>环境</span></div>
-              <div class="nav-pill"><span class="nav-icon"></span><span>模块</span></div>
+          <div class="shot-body">
+            <aside class="nav">
+              <div class="nav-item active"><span class="nav-icon"></span><span>监控</span></div>
+              <div class="nav-item"><span class="nav-icon"></span><span>项目</span></div>
+              <div class="nav-item"><span class="nav-icon"></span><span>环境</span></div>
+              <div class="nav-item"><span class="nav-icon"></span><span>模块</span></div>
+              <div class="nav-item"><span class="nav-icon"></span><span>配置</span></div>
             </aside>
-
-            <section class="content">
-              <div class="content-head">
+            <section class="canvas">
+              <div class="panel-head">
                 <div>
-                  <h2>项目管理</h2>
-                  <p>预览页使用示例数据展示布局；实际系统数据来自本地 SQLite 和项目目录扫描。</p>
+                  <h2>项目状态</h2>
+                  <p>按项目查看当前环境和模块运行状态</p>
                 </div>
-                <button class="small-btn" type="button">新建项目</button>
+                <div class="button-row">
+                  <button class="btn">刷新</button>
+                  <button class="btn primary">打开详情</button>
+                </div>
               </div>
-
-              <div class="toolbar">
-                <input class="field" value="按项目名或路径筛选" aria-label="筛选项目" readonly />
-                <button class="ghost-btn" type="button">刷新识别</button>
-                <button class="ghost-btn" type="button">选择目录</button>
-              </div>
-
-              <div class="project-list">
-                <article class="project-row">
-                  <span class="folder"></span>
-                  <div>
-                    <div class="row-title">Demo API <span class="tag">12 个模块</span></div>
-                    <span class="row-path">D:\Workspace\demo-api</span>
+              <div class="status-layout">
+                <div class="status-board">
+                  <div class="project-state">
+                    <div class="row-between">
+                      <span class="project-name">Demo API</span>
+                      <span class="state-pill"><span class="state-dot running"></span>运行中</span>
+                    </div>
+                    <ul class="module-lines">
+                      <li><span>dev / gateway</span><span>8051</span></li>
+                      <li><span>dev / order-service</span><span>8062</span></li>
+                      <li><span>dev / scheduler</span><span>未启动</span></li>
+                    </ul>
                   </div>
-                  <button class="outline-btn" type="button">编辑</button>
-                  <button class="outline-btn danger" type="button">删除</button>
-                </article>
-
-                <article class="project-row">
-                  <span class="folder"></span>
-                  <div>
-                    <div class="row-title">Demo Admin <span class="tag warn">待刷新</span></div>
-                    <span class="row-path">D:\Workspace\demo-admin</span>
+                  <div class="project-state">
+                    <div class="row-between">
+                      <span class="project-name">Demo Admin</span>
+                      <span class="state-pill"><span class="state-dot failed"></span>部分失败</span>
+                    </div>
+                    <ul class="module-lines">
+                      <li><span>test / admin-web</span><span>18080</span></li>
+                      <li><span>test / report-job</span><span>失败</span></li>
+                    </ul>
                   </div>
-                  <button class="outline-btn" type="button">编辑</button>
-                  <button class="outline-btn danger" type="button">删除</button>
-                </article>
+                </div>
+                <div class="detail-pane">
+                  <div class="row-between" style="margin-bottom: 12px">
+                    <div>
+                      <span class="project-name">项目详情</span>
+                      <div class="muted">选择一个环境后批量启停模块</div>
+                    </div>
+                    <div class="button-row">
+                      <button class="btn primary">批量启动</button>
+                      <button class="btn">批量关停</button>
+                      <button class="btn">刷新</button>
+                    </div>
+                  </div>
+                  <div class="env-tabs">
+                    <button class="env-tab active">dev 环境</button>
+                    <button class="env-tab">test 环境</button>
+                    <button class="env-tab">prod 环境</button>
+                  </div>
+                  <div class="module-grid">
+                    <div class="module-card"><div class="module-head"><span class="module-name">gateway</span><span class="state-pill"><span class="state-dot running"></span>运行</span></div><div class="module-port">端口 8051</div></div>
+                    <div class="module-card"><div class="module-head"><span class="module-name">order</span><span class="state-pill"><span class="state-dot starting"></span>启动中</span></div><div class="module-port">端口 8062</div></div>
+                    <div class="module-card"><div class="module-head"><span class="module-name">stock</span><span class="state-pill"><span class="state-dot"></span>停止</span></div><div class="module-port">端口 8073</div></div>
+                    <div class="module-card"><div class="module-head"><span class="module-name">report</span><span class="state-pill"><span class="state-dot failed"></span>失败</span></div><div class="module-port">端口 8090</div></div>
+                  </div>
+                  <div class="log-panel">
+                    <div class="log-title"><span>启动过程</span><span>gateway / dev</span></div>
+                    <pre class="log-lines"><code>[INFO] Scanning for projects...
+[INFO] --- spring-boot:run @ gateway ---
+[INFO] Active profile: dev
+[INFO] Started GatewayApplication in 18.42 seconds</code></pre>
+                  </div>
+                </div>
               </div>
             </section>
           </div>
-        </div>
-      </section>
+        </article>
 
-      <section class="section">
-        <h2>项目页面要解决的问题</h2>
-        <div class="grid">
-          <article class="card">
-            <h3>项目路径可配置</h3>
-            <p>换电脑后不依赖硬编码路径。通过项目页面重新选择目录，后续模块识别、配置读取和 Maven 启动都基于这个路径。</p>
-          </article>
-          <article class="card">
-            <h3>模块来自真实扫描</h3>
-            <p>项目添加后，系统扫描 Maven 结构和配置文件，识别可启动模块以及端口信息，不在页面中放固定业务模块。</p>
-          </article>
-          <article class="card">
-            <h3>操作闭环完整</h3>
-            <p>新建、编辑、删除、刷新识别都在页面内完成；删除使用独立确认框，不调用浏览器原生弹窗。</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="section">
-        <h2>和其他页面的关系</h2>
-        <div class="release-panel">
-          <div class="card">
-            <ul class="release-list">
-              <li>项目管理保存项目名称和本机目录。</li>
-              <li>模块管理读取项目目录，识别模块和启动端口。</li>
-              <li>配置管理按“环境 + 模块”保存常改配置。</li>
-              <li>监控面板基于项目、环境和模块执行 Maven 启停。</li>
-            </ul>
+        <article class="shot">
+          <div class="shot-head">
+            <div class="window-dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+            <span class="shot-title">项目管理</span>
           </div>
-          <pre class="code-box"><code>npm install
-npm run dev:all
+          <div class="shot-body">
+            <aside class="nav">
+              <div class="nav-item"><span class="nav-icon"></span><span>监控</span></div>
+              <div class="nav-item active"><span class="nav-icon"></span><span>项目</span></div>
+              <div class="nav-item"><span class="nav-icon"></span><span>环境</span></div>
+            </aside>
+            <section class="canvas">
+              <div class="panel-head">
+                <div><h2>项目管理</h2><p>维护项目名称和本机目录</p></div>
+                <button class="btn primary">新建项目</button>
+              </div>
+              <div class="toolbar">
+                <input class="field" value="按项目名或路径筛选" readonly />
+                <button class="btn">刷新识别</button>
+                <button class="btn">选择目录</button>
+              </div>
+              <div class="list">
+                <div class="list-row"><span class="icon-box">P</span><div><div class="project-name">Demo API <span class="tag">12 模块</span></div><div class="path">D:\Workspace\demo-api</div></div><button class="btn">编辑</button><button class="btn">删除</button></div>
+                <div class="list-row"><span class="icon-box">P</span><div><div class="project-name">Demo Admin <span class="tag warn">待刷新</span></div><div class="path">D:\Workspace\demo-admin</div></div><button class="btn">编辑</button><button class="btn">删除</button></div>
+                <div class="list-row"><span class="icon-box">P</span><div><div class="project-name">Demo Jobs <span class="tag">5 模块</span></div><div class="path">D:\Workspace\demo-jobs</div></div><button class="btn">编辑</button><button class="btn">删除</button></div>
+              </div>
+            </section>
+          </div>
+        </article>
 
-# 构建后启动
-npm run build
-npm start</code></pre>
-        </div>
+        <article class="shot">
+          <div class="shot-head">
+            <div class="window-dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+            <span class="shot-title">环境管理</span>
+          </div>
+          <div class="shot-body">
+            <aside class="nav">
+              <div class="nav-item"><span class="nav-icon"></span><span>项目</span></div>
+              <div class="nav-item active"><span class="nav-icon"></span><span>环境</span></div>
+              <div class="nav-item"><span class="nav-icon"></span><span>模块</span></div>
+            </aside>
+            <section class="canvas">
+              <div class="panel-head">
+                <div><h2>环境管理</h2><p>只维护环境名称和标识</p></div>
+                <button class="btn primary">新建环境</button>
+              </div>
+              <div class="card-grid">
+                <div class="mini-card"><h3>dev 环境</h3><div class="muted">code: dev</div><div class="button-row" style="margin-top: 18px"><button class="btn">编辑</button><button class="btn">删除</button></div></div>
+                <div class="mini-card"><h3>test 环境</h3><div class="muted">code: test</div><div class="button-row" style="margin-top: 18px"><button class="btn">编辑</button><button class="btn">删除</button></div></div>
+                <div class="mini-card"><h3>prod 环境</h3><div class="muted">code: prod</div><div class="button-row" style="margin-top: 18px"><button class="btn">编辑</button><button class="btn">删除</button></div></div>
+              </div>
+            </section>
+          </div>
+        </article>
+
+        <article class="shot">
+          <div class="shot-head">
+            <div class="window-dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+            <span class="shot-title">模块管理</span>
+          </div>
+          <div class="shot-body">
+            <aside class="nav">
+              <div class="nav-item"><span class="nav-icon"></span><span>环境</span></div>
+              <div class="nav-item active"><span class="nav-icon"></span><span>模块</span></div>
+              <div class="nav-item"><span class="nav-icon"></span><span>配置</span></div>
+            </aside>
+            <section class="canvas">
+              <div class="panel-head">
+                <div><h2>模块管理</h2><p>从项目目录自动识别模块和端口</p></div>
+                <button class="btn primary">识别模块</button>
+              </div>
+              <div class="list">
+                <div class="list-row"><span class="icon-box">M</span><div><div class="project-name">gateway <span class="tag">8051</span></div><div class="path">Spring Boot 模块</div></div><button class="btn">编辑端口</button><button class="btn">删除</button></div>
+                <div class="list-row"><span class="icon-box">M</span><div><div class="project-name">order-service <span class="tag">8062</span></div><div class="path">Spring Boot 模块</div></div><button class="btn">编辑端口</button><button class="btn">删除</button></div>
+                <div class="list-row"><span class="icon-box">M</span><div><div class="project-name">report-job <span class="tag warn">未配置</span></div><div class="path">定时任务模块</div></div><button class="btn">编辑端口</button><button class="btn">删除</button></div>
+              </div>
+            </section>
+          </div>
+        </article>
+
+        <article class="shot">
+          <div class="shot-head">
+            <div class="window-dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+            <span class="shot-title">配置管理</span>
+          </div>
+          <div class="shot-body">
+            <aside class="nav">
+              <div class="nav-item"><span class="nav-icon"></span><span>模块</span></div>
+              <div class="nav-item active"><span class="nav-icon"></span><span>配置</span></div>
+              <div class="nav-item"><span class="nav-icon"></span><span>监控</span></div>
+            </aside>
+            <section class="canvas">
+              <div class="panel-head">
+                <div><h2>配置管理</h2><p>按环境 + 模块保存常改配置</p></div>
+                <div class="button-row"><button class="btn">重新获取</button><button class="btn primary">保存配置</button></div>
+              </div>
+              <div class="config-layout">
+                <div class="config-side">
+                  <select class="select"><option>dev 环境</option></select>
+                  <select class="select"><option>gateway</option></select>
+                  <div class="mini-card"><h3>唯一配置</h3><div class="muted">环境 + 模块</div></div>
+                </div>
+                <div class="config-pane">
+                  <div class="config-group"><h3>启动配置</h3><div class="form-grid"><label class="field-label">端口<input class="field" value="8051" readonly /></label><label class="field-label">Nacos Namespace<input class="field" value="demo-dev" readonly /></label></div></div>
+                  <div class="config-group"><h3>Redis / MQ</h3><div class="form-grid"><label class="field-label">Redis 地址<input class="field" value="127.0.0.1:6379" readonly /></label><label class="field-label">RabbitMQ vhost<input class="field" value="/demo" readonly /></label></div></div>
+                  <div class="config-group"><h3>数据库</h3><div class="form-grid"><label class="field-label">JDBC URL<input class="field" value="jdbc:mysql://127.0.0.1:3306/demo" readonly /></label><label class="field-label">用户名<input class="field" value="demo_user" readonly /></label></div></div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </article>
       </section>
 
-      <section class="section">
-        <h2>数据边界</h2>
-        <p class="note">
-          预览页包含通用 mock 项目，用来展示项目管理页面布局；真实运行时，项目、环境、模块和配置全部来自本机 SQLite 与实际项目扫描。数据库、日志、临时配置文件已排除在代码提交之外。
-        </p>
-      </section>
-
-      <footer class="footer">Release preview for Project Env Launcher</footer>
+      <footer class="footer">
+        预览页仅使用通用 mock 数据展示页面效果；真实项目、环境、模块、配置和日志均来自本机运行数据。
+      </footer>
     </main>
   </body>
 </html>
