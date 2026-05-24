@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>项目环境启动台 | Preview</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", "Microsoft YaHei", sans-serif;
+        background: #061018;
+        color: #eef6ff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-width: 320px;
+        min-height: 100vh;
+        margin: 0;
+        background:
+          radial-gradient(circle at 20% 0%, rgba(39, 117, 209, 0.22), transparent 24rem),
+          radial-gradient(circle at 82% 30%, rgba(20, 184, 166, 0.15), transparent 26rem),
+          linear-gradient(135deg, #07111b 0%, #0a131c 48%, #03070d 100%);
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .page {
+        min-height: 100vh;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 22px 24px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: #dceeff;
+        font-weight: 800;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border: 1px solid rgba(125, 211, 252, 0.3);
+        border-radius: 8px;
+        background: rgba(15, 23, 42, 0.72);
+        color: #8bd8ff;
+      }
+
+      .repo-link {
+        padding: 9px 13px;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        border-radius: 8px;
+        color: #d8e9fb;
+        text-decoration: none;
+        background: rgba(8, 17, 28, 0.7);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
+        gap: 36px;
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 54px 24px 36px;
+        align-items: center;
+      }
+
+      .eyebrow {
+        margin: 0 0 14px;
+        color: #7dd3fc;
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      h1 {
+        max-width: 760px;
+        margin: 0;
+        color: #f8fbff;
+        font-size: clamp(42px, 7vw, 76px);
+        line-height: 0.98;
+        letter-spacing: 0;
+      }
+
+      .lead {
+        max-width: 720px;
+        margin: 22px 0 0;
+        color: #b8c8da;
+        font-size: 18px;
+        line-height: 1.72;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 28px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        padding: 0 16px;
+        border-radius: 8px;
+        font-weight: 800;
+        text-decoration: none;
+      }
+
+      .button.primary {
+        color: #04111f;
+        background: #7dd3fc;
+      }
+
+      .button.secondary {
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        color: #e8f3ff;
+        background: rgba(15, 23, 42, 0.7);
+      }
+
+      .terminal {
+        overflow: hidden;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 8px;
+        background: rgba(3, 7, 13, 0.82);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+      }
+
+      .terminal-head {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        height: 42px;
+        padding: 0 14px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.13);
+      }
+
+      .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+      }
+
+      .dot.red {
+        background: #fb7185;
+      }
+
+      .dot.yellow {
+        background: #facc15;
+      }
+
+      .dot.green {
+        background: #34d399;
+      }
+
+      pre {
+        margin: 0;
+        padding: 22px;
+        overflow-x: auto;
+        color: #d5e7f8;
+        font: 14px/1.75 "Cascadia Mono", Consolas, monospace;
+      }
+
+      .section {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 34px 24px;
+      }
+
+      .section h2 {
+        margin: 0 0 18px;
+        color: #f7fbff;
+        font-size: 28px;
+        letter-spacing: 0;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .card {
+        min-height: 160px;
+        padding: 20px;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 8px;
+        background: rgba(9, 19, 31, 0.72);
+      }
+
+      .card h3 {
+        margin: 0 0 10px;
+        color: #eef6ff;
+        font-size: 18px;
+      }
+
+      .card p,
+      .note {
+        margin: 0;
+        color: #a9bbcf;
+        line-height: 1.68;
+      }
+
+      .workflow {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .step {
+        padding: 16px;
+        border: 1px solid rgba(125, 211, 252, 0.16);
+        border-radius: 8px;
+        background: rgba(5, 16, 27, 0.78);
+      }
+
+      .step strong {
+        display: block;
+        margin-bottom: 8px;
+        color: #8bd8ff;
+      }
+
+      .step span {
+        color: #b5c6d9;
+        line-height: 1.55;
+      }
+
+      .footer {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 28px 24px 42px;
+        color: #8293a8;
+      }
+
+      @media (max-width: 880px) {
+        .hero {
+          grid-template-columns: 1fr;
+          padding-top: 32px;
+        }
+
+        .grid,
+        .workflow {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark">PE</span>
+          <span>项目环境启动台</span>
+        </div>
+        <a class="repo-link" href="https://github.com/scottzzj/project-env-launcher">GitHub 仓库</a>
+      </header>
+
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Project Env Launcher</p>
+          <h1>本地项目环境启动与配置管理工具</h1>
+          <p class="lead">
+            用一个本地 Web 控制台管理项目路径、环境、模块端口和常用配置，并通过 Maven 启动指定模块。运行数据来自本机 SQLite 与实际进程扫描，预览页不包含任何本地业务配置。
+          </p>
+          <div class="actions">
+            <a class="button primary" href="https://github.com/scottzzj/project-env-launcher">查看源码</a>
+            <a class="button secondary" href="#run">本地启动</a>
+          </div>
+        </div>
+
+        <div class="terminal" id="run">
+          <div class="terminal-head">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
+          </div>
+          <pre><code>npm install
+npm run dev:all
+
+# 或构建后运行
+npm run build
+npm start</code></pre>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>功能预览</h2>
+        <div class="grid">
+          <article class="card">
+            <h3>项目管理</h3>
+            <p>手工维护本机项目路径，支持编辑、删除和刷新识别结果，路径变更后可在页面中重新配置。</p>
+          </article>
+          <article class="card">
+            <h3>环境与配置</h3>
+            <p>维护环境清单，并按“环境 + 模块”保存 Nacos、RabbitMQ、Redis、数据库与启动端口等常改项。</p>
+          </article>
+          <article class="card">
+            <h3>模块启动</h3>
+            <p>从项目中识别可启动模块，按当前环境批量启动或关停，启动过程保留在当前页面的实时日志中。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>本地工作流</h2>
+        <div class="workflow">
+          <div class="step"><strong>1. 添加项目</strong><span>选择本机项目目录。</span></div>
+          <div class="step"><strong>2. 维护环境</strong><span>录入实际使用的环境。</span></div>
+          <div class="step"><strong>3. 识别模块</strong><span>扫描 Maven 模块与端口。</span></div>
+          <div class="step"><strong>4. 保存配置</strong><span>按环境和模块落库。</span></div>
+          <div class="step"><strong>5. 启停服务</strong><span>执行 Maven 并查看日志。</span></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>数据边界</h2>
+        <p class="note">
+          项目运行时会在本地生成 SQLite 数据库、启动日志和临时配置文件；这些内容已通过 .gitignore 排除，不会进入公开代码提交。换电脑后重新配置项目路径和环境即可使用。
+        </p>
+      </section>
+
+      <footer class="footer">© 2026 Project Env Launcher</footer>
+    </main>
+  </body>
+</html>
