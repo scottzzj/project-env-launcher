@@ -81,6 +81,10 @@ server/data/runtime-configs/.gitkeep
 
 ## 发布
 
-当前版本：[v0.1.0](https://github.com/scottzzj/project-env-launcher/releases/tag/v0.1.0)
+当前版本：[v0.1.1](https://github.com/scottzzj/project-env-launcher/releases/tag/v0.1.1)
 
 预览页通过主仓库的 GitHub Pages 发布，只包含静态页面，不包含本地运行数据。
+
+## 许可证
+
+本项目使用 [MIT License](LICENSE)。
