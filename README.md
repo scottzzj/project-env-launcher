@@ -2,7 +2,7 @@
 
 本地项目环境启动台。它把本机项目路径、环境、模块、常用配置和 Maven 启停流程放到一个 Web 控制台里管理，适合需要频繁切换环境、启动多个 Spring Boot/Maven 模块的本地开发场景。
 
-预览页：[https://scottzzj.github.io/project-env-launcher-preview/](https://scottzzj.github.io/project-env-launcher-preview/)
+预览页：[https://scottzzj.github.io/project-env-launcher/](https://scottzzj.github.io/project-env-launcher/)
 
 ## 功能
 
@@ -83,4 +83,4 @@ server/data/runtime-configs/.gitkeep
 
 当前版本：[v0.1.0](https://github.com/scottzzj/project-env-launcher/releases/tag/v0.1.0)
 
-预览页单独发布在公开仓库，只包含静态页面，不包含源码和本地运行数据。
+预览页通过主仓库的 GitHub Pages 发布，只包含静态页面，不包含本地运行数据。
