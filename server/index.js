@@ -777,7 +777,12 @@ async function scanProjectModules(project) {
     return [...currentModule, ...childResults.flat()];
   }
 
-  return scanDirectory();
+  if (await fileExists(path.join(rootPath, 'pom.xml'))) {
+    return scanDirectory();
+  }
+
+  // Some projects keep the Maven aggregator under modules/pom.xml instead of the project root.
+  return scanDirectory('modules');
 }
 
 function normalizeModuleSetting(setting = {}) {

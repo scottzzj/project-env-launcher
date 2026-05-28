@@ -21,8 +21,15 @@ function isStartupGroup(group) {
   return group.groupKey === 'startup-nacos';
 }
 
-function getDefaultProject(projects = []) {
-  return projects[0] ?? null;
+function getDefaultProject(projects = [], modules = []) {
+  const firstProjectWithModules = projects.find((project) =>
+    modules.some(
+      (moduleItem) =>
+        moduleItem.projectIds?.includes(project.id) && !moduleItem.hasChildren && moduleItem.defaultPort,
+    ),
+  );
+
+  return firstProjectWithModules ?? projects[0] ?? null;
 }
 
 function getPreferredModule(modules = []) {
@@ -45,8 +52,8 @@ function ConfigurationManagement({
   const [notice, setNotice] = useState('');
 
   const selectedProject = useMemo(
-    () => getDefaultProject(projects),
-    [projects],
+    () => getDefaultProject(projects, modules),
+    [modules, projects],
   );
   const selectedEnvironment = useMemo(
     () => environments.find((environment) => environment.code === environmentCode) ?? environments[0] ?? null,

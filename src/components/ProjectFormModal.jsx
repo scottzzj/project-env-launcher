@@ -1,6 +1,13 @@
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+function inferProjectNameFromPath(projectPath = '') {
+  const normalizedPath = String(projectPath).trim().replace(/[\\/]+$/g, '');
+  const pathParts = normalizedPath.split(/[\\/]+/).filter(Boolean);
+
+  return pathParts.at(-1) ?? '';
+}
+
 function ProjectFormModal({ initialProject, isBusy, mode, onClose, onPickPath, onSubmit }) {
   const [form, setForm] = useState({ name: '', path: '' });
   const [pathPickerType, setPathPickerType] = useState('');
@@ -26,6 +33,22 @@ function ProjectFormModal({ initialProject, isBusy, mode, onClose, onPickPath, o
     onSubmit({ name: form.name.trim(), path: form.path.trim() });
   }
 
+  function updateProjectPath(pathValue) {
+    setForm((current) => {
+      const inferredName = inferProjectNameFromPath(pathValue);
+      const previousInferredName = inferProjectNameFromPath(current.path);
+      const canAutoFillName =
+        mode === 'create' && inferredName && (!current.name.trim() || current.name === previousInferredName);
+
+      // Only auto-fill while creating, and do not overwrite a name the user has customized.
+      return {
+        ...current,
+        path: pathValue,
+        name: canAutoFillName ? inferredName : current.name,
+      };
+    });
+  }
+
   async function handlePickPath(type) {
     if (!onPickPath || pathPickerType) {
       return;
@@ -36,7 +59,7 @@ function ProjectFormModal({ initialProject, isBusy, mode, onClose, onPickPath, o
     try {
       const selectedPath = await onPickPath(type);
       if (selectedPath) {
-        setForm((current) => ({ ...current, path: selectedPath }));
+        updateProjectPath(selectedPath);
       }
     } catch (error) {
       setPathPickerError(error.message || '路径选择失败');
@@ -71,7 +94,7 @@ function ProjectFormModal({ initialProject, isBusy, mode, onClose, onPickPath, o
               <input
                 id="project-path-input"
                 value={form.path}
-                onChange={(event) => setForm((current) => ({ ...current, path: event.target.value }))}
+                onChange={(event) => updateProjectPath(event.target.value)}
                 placeholder="例如：D:\\Workspace\\order-service"
               />
               <button
