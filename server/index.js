@@ -777,7 +777,12 @@ async function scanProjectModules(project) {
     return [...currentModule, ...childResults.flat()];
   }
 
-  return scanDirectory();
+  if (await fileExists(path.join(rootPath, 'pom.xml'))) {
+    return scanDirectory();
+  }
+
+  // Some projects keep the Maven aggregator under modules/pom.xml instead of the project root.
+  return scanDirectory('modules');
 }
 
 function normalizeModuleSetting(setting = {}) {
@@ -1293,6 +1298,19 @@ function findSystemRunRecordProcess(processes, record) {
   return findSystemModuleProcess(processes, moduleCwd, serverPort, profile, runtimeConfigDirectory);
 }
 
+function processMatchesRunRecord(processInfo, record) {
+  if (!processInfo || !record) {
+    return false;
+  }
+
+  const moduleCwd = record.moduleCwd ?? record.cwd ?? '';
+  const serverPort = record.ports?.server ? Number(record.ports.server) : null;
+  const profile = record.profile ?? record.environmentCode ?? record.branch ?? '';
+  const runtimeConfigDirectory = record.runtimeConfigPath ? path.dirname(record.runtimeConfigPath) : '';
+
+  return processMatchesModule(processInfo, moduleCwd, serverPort, profile, runtimeConfigDirectory);
+}
+
 async function killProcessTree(pid) {
   const normalizedPid = Number(pid);
   if (!Number.isInteger(normalizedPid) || normalizedPid <= 0) {
@@ -1333,15 +1351,16 @@ async function confirmRunRecordStopped(record) {
     const processes = await listSystemJavaProcesses();
     const matchingProcess = findSystemRunRecordProcess(processes, record);
     const portListening = serverPort ? await isPortListening(serverPort) : false;
-    if (!matchingProcess && !portListening) {
-      return { stopped: true, matchingProcess: null, portListening: false };
+    if (!matchingProcess) {
+      return { stopped: true, matchingProcess: null, portListening };
     }
   }
 
   const processes = await listSystemJavaProcesses();
+  const matchingProcess = findSystemRunRecordProcess(processes, record);
   return {
-    stopped: false,
-    matchingProcess: findSystemRunRecordProcess(processes, record),
+    stopped: !matchingProcess,
+    matchingProcess,
     portListening: serverPort ? await isPortListening(serverPort) : false,
   };
 }
@@ -1896,13 +1915,21 @@ async function stopProjectModuleRecords(project, moduleIds, environment) {
   if (stoppedRecords.length > 0) {
     for (const record of stoppedRecords) {
       const child = managedProcesses.get(record.id);
-      const pids = new Set([child?.pid, record.processId].filter(Boolean));
-      if (pids.size === 0) {
-        const processes = await listSystemJavaProcesses();
-        const matchingProcess = findSystemRunRecordProcess(processes, record);
-        if (matchingProcess?.processId) {
-          pids.add(matchingProcess.processId);
+      const processes = await listSystemJavaProcesses();
+      const processesByPid = new Map(processes.map((processInfo) => [processInfo.processId, processInfo]));
+      const pids = new Set();
+
+      for (const pid of [child?.pid, record.processId].filter(Boolean)) {
+        const processInfo = processesByPid.get(pid);
+        // PID can be stale or reused; never kill it unless it still matches this run record.
+        if (processMatchesRunRecord(processInfo, record)) {
+          pids.add(pid);
         }
+      }
+
+      const matchingProcess = findSystemRunRecordProcess(processes, record);
+      if (matchingProcess?.processId) {
+        pids.add(matchingProcess.processId);
       }
 
       for (const pid of pids) {

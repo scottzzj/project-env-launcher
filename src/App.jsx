@@ -128,22 +128,6 @@ function App() {
     }
   }, []);
 
-  const handleSaveEnvironmentConfig = useCallback(async (configData) => {
-    setIsEnvironmentConfigBusy(true);
-    try {
-      const payload = await saveEnvironmentConfig(configData);
-      setEnvironmentConfig(payload);
-      setMeta(payload.meta ?? defaultMeta);
-      setError('');
-      return payload;
-    } catch (requestError) {
-      setError(requestError.message);
-      throw requestError;
-    } finally {
-      setIsEnvironmentConfigBusy(false);
-    }
-  }, []);
-
   const applyListPayload = useCallback((payload) => {
     const nextProjects = payload.projects ?? [];
     setProjects(nextProjects);
@@ -209,6 +193,23 @@ function App() {
       setError(requestError.message);
     }
   }, [applyListPayload, loadDashboardSummary, loadModules]);
+
+  const handleSaveEnvironmentConfig = useCallback(async (configData) => {
+    setIsEnvironmentConfigBusy(true);
+    try {
+      const payload = await saveEnvironmentConfig(configData);
+      setEnvironmentConfig(payload);
+      setMeta(payload.meta ?? defaultMeta);
+      setError('');
+      await refreshDashboardData();
+      return payload;
+    } catch (requestError) {
+      setError(requestError.message);
+      throw requestError;
+    } finally {
+      setIsEnvironmentConfigBusy(false);
+    }
+  }, [refreshDashboardData]);
 
   const handleDetailRefresh = useCallback(async () => {
     setIsDetailRefreshing(true);
@@ -301,13 +302,14 @@ function App() {
       const payload = await refreshModules();
       setModules(payload.modules ?? []);
       setMeta(payload.meta ?? defaultMeta);
-      setError('');
+      applyListPayload(await fetchProjects());
+      await loadDashboardSummary();
     } catch (requestError) {
       setError(requestError.message);
     } finally {
       setIsModuleBusy(false);
     }
-  }, []);
+  }, [applyListPayload, loadDashboardSummary]);
 
   const handleSubmitModuleForm = useCallback(async (moduleData) => {
     setIsModuleBusy(true);
@@ -322,7 +324,7 @@ function App() {
     } finally {
       setIsModuleBusy(false);
     }
-  }, [moduleFormState]);
+  }, []);
 
   const handleDeleteModule = useCallback((moduleItem) => {
     setDeleteTarget({ type: 'module', item: moduleItem });

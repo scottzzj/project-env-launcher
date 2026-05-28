@@ -9,8 +9,14 @@ function ConfirmDialog({
   onConfirm,
   title,
 }) {
+  function handleOverlayClick() {
+    if (!isBusy) {
+      onCancel();
+    }
+  }
+
   return (
-    <div className="confirm-dialog-overlay" role="presentation" onClick={onCancel}>
+    <div className="confirm-dialog-overlay" role="presentation" onClick={handleOverlayClick}>
       <section
         className="confirm-dialog"
         role="dialog"

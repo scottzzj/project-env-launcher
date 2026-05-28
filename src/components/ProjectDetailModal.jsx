@@ -1,4 +1,4 @@
-import { ClipboardList, RefreshCw, Square, X } from 'lucide-react';
+import { ClipboardList, Copy, RefreshCw, Square, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 const ACTIVE_RUN_STATUSES = new Set(['starting', 'running']);
@@ -46,6 +46,29 @@ function sortEnvironmentsForDetail(environments) {
   });
 }
 
+async function copyTextToClipboard(text) {
+  if (navigator?.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  textArea.setAttribute('readonly', '');
+  textArea.style.position = 'fixed';
+  textArea.style.left = '-9999px';
+  document.body.appendChild(textArea);
+  textArea.select();
+
+  try {
+    if (!document.execCommand('copy')) {
+      throw new Error('copy failed');
+    }
+  } finally {
+    document.body.removeChild(textArea);
+  }
+}
+
 function ProjectDetailModal({
   environments,
   modules,
@@ -69,6 +92,8 @@ function ProjectDetailModal({
   const [liveLogs, setLiveLogs] = useState({});
   const [liveRecords, setLiveRecords] = useState({});
   const [isLogPinned, setIsLogPinned] = useState(true);
+  const [stoppingRecordId, setStoppingRecordId] = useState('');
+  const [copyLogStatus, setCopyLogStatus] = useState('idle');
   const logRef = useRef(null);
   const activeProject = selectedProject;
   const orderedEnvironments = useMemo(
@@ -252,6 +277,60 @@ function ProjectDetailModal({
     setActiveProcessId('');
   }
 
+  async function handleStopActiveRecord(record) {
+    if (!record?.moduleId || !record.environmentCode || !activeProject || !onStopModules) {
+      return;
+    }
+
+    setStoppingRecordId(record.id);
+    let result;
+    try {
+      result = await onStopModules(activeProject.id, [
+        {
+          moduleId: record.moduleId,
+          environmentCode: record.environmentCode,
+        },
+      ]);
+    } catch {
+      return;
+    } finally {
+      setStoppingRecordId('');
+    }
+
+    const stoppedRecord = (result.stoppedRecords ?? []).find((item) => item.id === record.id);
+    if (stoppedRecord) {
+      setLiveRecords((currentRecords) => ({
+        ...currentRecords,
+        [stoppedRecord.id]: stoppedRecord,
+      }));
+
+      if (!isActiveRunRecord(stoppedRecord)) {
+        setStartupRecordIds((currentRecordIds) =>
+          currentRecordIds.filter((recordId) => recordId !== stoppedRecord.id),
+        );
+        setActiveProcessId((currentRecordId) => (currentRecordId === stoppedRecord.id ? '' : currentRecordId));
+      }
+    }
+
+    setStopResult(result);
+    setStartResult(null);
+  }
+
+  async function handleCopyActiveLog() {
+    if (!activeLogText) {
+      setCopyLogStatus('empty');
+      return;
+    }
+
+    setCopyLogStatus('copying');
+    try {
+      await copyTextToClipboard(activeLogText);
+      setCopyLogStatus('copied');
+    } catch {
+      setCopyLogStatus('failed');
+    }
+  }
+
   function formatModuleRuntimeState(records) {
     if (!records.length) {
       return '';
@@ -292,6 +371,10 @@ function ProjectDetailModal({
     visibleRunRecords.find((record) => record.id === activeProcessId) ?? visibleRunRecords[0] ?? null;
   const activeLogText =
     activeProcessRecord ? liveLogs[activeProcessRecord.id] ?? activeProcessRecord.lastOutput ?? '' : '';
+
+  useEffect(() => {
+    setCopyLogStatus('idle');
+  }, [activeProcessRecord?.id]);
 
   useEffect(() => {
     setActiveProcessId((currentId) =>
@@ -571,7 +654,24 @@ function ProjectDetailModal({
                   <article className={`startup-process-card status-${activeProcessRecord.status ?? 'starting'}`}>
                     <div className="startup-process-title">
                       <strong>{activeProcessRecord.moduleName}</strong>
-                      <span>{activeProcessRecord.statusText ?? '启动中'}</span>
+                      <div className="startup-process-status-actions">
+                        <button
+                          className="startup-kill-port-button"
+                          type="button"
+                          onClick={() => handleStopActiveRecord(activeProcessRecord)}
+                          disabled={
+                            isStarting ||
+                            stoppingRecordId === activeProcessRecord.id ||
+                            !isActiveRunRecord(activeProcessRecord) ||
+                            !activeProcessRecord.ports?.server
+                          }
+                          title={`杀掉当前记录端口 ${activeProcessRecord.ports?.server ?? '-'} 对应的进程`}
+                        >
+                          <Square size={13} />
+                          {stoppingRecordId === activeProcessRecord.id ? '处理中' : '杀端口进程'}
+                        </button>
+                        <span>{activeProcessRecord.statusText ?? '启动中'}</span>
+                      </div>
                     </div>
                     <div className="startup-process-meta">
                       <span>环境：{activeProcessRecord.environmentName ?? activeProcessRecord.branchName}</span>
@@ -582,9 +682,28 @@ function ProjectDetailModal({
                     <code>{activeProcessRecord.command}</code>
                     <div className="startup-log-toolbar">
                       <span>实时日志</span>
-                      <button type="button" onClick={() => setIsLogPinned(true)}>
-                        滚动到底部
-                      </button>
+                      <div className="startup-log-actions">
+                        <button
+                          className={copyLogStatus === 'copied' ? 'copied' : ''}
+                          type="button"
+                          onClick={handleCopyActiveLog}
+                          disabled={copyLogStatus === 'copying'}
+                        >
+                          <Copy size={14} />
+                          {copyLogStatus === 'copying'
+                            ? '复制中'
+                            : copyLogStatus === 'copied'
+                              ? '已复制'
+                              : copyLogStatus === 'empty'
+                                ? '无日志'
+                                : copyLogStatus === 'failed'
+                                  ? '复制失败'
+                                  : '复制实时日志'}
+                        </button>
+                        <button type="button" onClick={() => setIsLogPinned(true)}>
+                          滚动到底部
+                        </button>
+                      </div>
                     </div>
                     <pre ref={logRef} onScroll={handleLogScroll}>
                       {activeLogText || '等待启动日志...'}
