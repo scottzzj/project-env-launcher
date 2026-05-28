@@ -1347,6 +1347,31 @@ select:disabled {
   font-weight: 900;
 }
 
+.startup-process-status-actions,
+.startup-log-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.startup-kill-port-button {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  border-radius: 999px;
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.22);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
 .startup-process-meta {
   flex-wrap: wrap;
 }
@@ -1384,7 +1409,11 @@ select:disabled {
 }
 
 .startup-log-toolbar button {
+  display: inline-flex;
   height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   border: 1px solid rgba(129, 151, 179, 0.18);
   border-radius: 6px;
   color: #dbeafe;
@@ -1393,6 +1422,12 @@ select:disabled {
   font-size: 12px;
   font-weight: 900;
   cursor: pointer;
+}
+
+.startup-log-toolbar button.copied {
+  border-color: rgba(34, 197, 94, 0.3);
+  color: #bbf7d0;
+  background: rgba(22, 101, 52, 0.16);
 }
 
 .startup-process-card pre {
