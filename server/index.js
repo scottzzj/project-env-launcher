@@ -27,9 +27,12 @@ import {
   getContentHash,
   getYamlScalar,
   getYamlScalarValue,
+  mergeYamlConfigContents,
   normalizeEditableConfigFields,
   parsePortValue,
+  sanitizeProfileSpecificConfigContent,
   SERVER_PORT_PATH,
+  selectEnvironmentProfileConfigNames,
   setRequiredYamlScalar,
   summarizeEnvironmentConfig,
 } from './environment-config-utils.js';
@@ -293,18 +296,7 @@ async function readFirstExistingConfig(filePaths) {
   };
 }
 
-function parseActiveProfiles(configContent) {
-  const yamlValue = getYamlScalarValue(configContent, ['spring', 'profiles', 'active']);
-  const propertiesMatch = String(configContent ?? '').match(/^\s*spring\.profiles\.active\s*=\s*([^#\r\n]+)/m);
-  const activeValue = yamlValue || propertiesMatch?.[1] || '';
-
-  return activeValue
-    .split(',')
-    .map((profile) => normalizeRequiredString(profile).toLowerCase())
-    .filter(Boolean);
-}
-
-async function readModuleProfileConfigs(resourcePath, baseConfig) {
+async function readModuleProfileConfigs(resourcePath, baseConfig, profile) {
   let entries = [];
   try {
     entries = await readdir(resourcePath, { withFileTypes: true });
@@ -317,19 +309,7 @@ async function readModuleProfileConfigs(resourcePath, baseConfig) {
     .map((entry) => entry.name)
     .filter((name) => /^application-[^.]+\.(ya?ml|properties)$/i.test(name))
     .sort((first, second) => first.localeCompare(second, 'zh-CN'));
-
-  const activeProfiles = parseActiveProfiles(baseConfig?.content ?? '');
-  const preferredNames = activeProfiles.flatMap((profile) => [
-    `application-${profile}.yml`,
-    `application-${profile}.yaml`,
-    `application-${profile}.properties`,
-  ]);
-  const orderedNames = [
-    ...preferredNames.filter((name) => profileConfigNames.some((configName) => configName.toLowerCase() === name)),
-    ...profileConfigNames.filter(
-      (name) => !preferredNames.some((preferredName) => preferredName === name.toLowerCase()),
-    ),
-  ];
+  const orderedNames = selectEnvironmentProfileConfigNames(profileConfigNames, baseConfig?.content ?? '', profile);
   const configs = [];
   const seenNames = new Set();
 
@@ -350,10 +330,7 @@ async function readModuleProfileConfigs(resourcePath, baseConfig) {
 }
 
 function mergeConfigContents(configContents = []) {
-  return configContents
-    .map((content) => String(content ?? '').trim())
-    .filter(Boolean)
-    .join('\n\n');
+  return mergeYamlConfigContents(configContents);
 }
 
 async function resolveEnvironmentConfig(project, moduleConfig, environment) {
@@ -367,7 +344,7 @@ async function resolveEnvironmentConfig(project, moduleConfig, environment) {
   const baseFileNames = ['application.yml', 'application.yaml', 'application.properties'];
   const baseCandidates = baseFileNames.map((fileName) => path.join(resourcePath, fileName));
   const baseConfig = await readFirstExistingConfig(baseCandidates);
-  const profileConfigs = await readModuleProfileConfigs(resourcePath, baseConfig);
+  const profileConfigs = await readModuleProfileConfigs(resourcePath, baseConfig, profile);
   const templatePath = profileConfigs[0]?.filePath ?? baseConfig?.filePath ?? null;
   const activePath = templatePath;
 
@@ -705,7 +682,8 @@ async function saveEnvironmentConfig(payload = {}) {
     return { error: '配置内容不能为空', statusCode: 400 };
   }
 
-  const content = fields.length > 0 ? applyEnvironmentConfigFields(baseContent, fields) : baseContent;
+  const editedContent = fields.length > 0 ? applyEnvironmentConfigFields(baseContent, fields) : baseContent;
+  const content = sanitizeProfileSpecificConfigContent(editedContent);
   const configId = buildEnvironmentConfigId(environment.code, moduleConfig.id);
   const savedAt = new Date().toISOString();
   await saveSavedEnvironmentConfig({

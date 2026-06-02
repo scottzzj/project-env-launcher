@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 
 export const SERVER_PORT_PATH = ['server', 'port'];
+const PROFILE_ACTIVATION_PATH = ['spring', 'profiles', 'active'];
+const PROFILE_ACTIVATION_DOTTED_PATH = PROFILE_ACTIVATION_PATH.join('.');
 
 const ENVIRONMENT_CONFIG_FIELDS = {
   database: {
@@ -269,6 +271,314 @@ export function getYamlScalarValue(content, keyPath) {
     .at(-1)?.value ?? '';
 }
 
+export function parseActiveProfiles(configContent) {
+  const yamlValue = getYamlScalarValue(configContent, ['spring', 'profiles', 'active']);
+  const propertiesMatch = String(configContent ?? '').match(/^\s*spring\.profiles\.active\s*=\s*([^#\r\n]+)/m);
+  const activeValue = yamlValue || propertiesMatch?.[1] || '';
+
+  return activeValue
+    .split(',')
+    .map((profile) => normalizeRequiredString(profile).toLowerCase())
+    .filter(Boolean);
+}
+
+export function selectEnvironmentProfileConfigNames(configFileNames = [], baseContent = '', profile = '') {
+  const normalizedNames = configFileNames
+    .map((name) => normalizeRequiredString(name))
+    .filter((name) => /^application-[^.]+\.(ya?ml|properties)$/i.test(name));
+  const requestedProfile = normalizeRequiredString(profile).toLowerCase();
+  const fallbackProfiles = requestedProfile && requestedProfile !== 'dev' ? ['dev'] : [];
+  const activeProfiles = parseActiveProfiles(baseContent).filter(
+    (activeProfile) => activeProfile === requestedProfile || fallbackProfiles.includes(activeProfile),
+  );
+  const selectedProfiles = Array.from(new Set([requestedProfile, ...fallbackProfiles, ...activeProfiles].filter(Boolean)));
+  const preferredNames = selectedProfiles.flatMap((profileName) => [
+    `application-${profileName}.yml`,
+    `application-${profileName}.yaml`,
+    `application-${profileName}.properties`,
+  ]);
+
+  return preferredNames.filter((name) =>
+    normalizedNames.some((configName) => configName.toLowerCase() === name),
+  );
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function stripYamlLineComment(rawLine) {
+  return String(rawLine ?? '').replace(/\s+#.*$/, '');
+}
+
+function parseSimpleYamlScalar(rawValue) {
+  const value = normalizeRequiredString(rawValue);
+  if (!value) {
+    return '';
+  }
+
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    return value.slice(1, -1);
+  }
+
+  return value;
+}
+
+function assignYamlChild(parentContainer, key, value) {
+  if (Array.isArray(parentContainer)) {
+    parentContainer.push({ [key]: value });
+    return value;
+  }
+
+  if (isPlainObject(parentContainer[key]) && isPlainObject(value)) {
+    return parentContainer[key];
+  }
+
+  parentContainer[key] = value;
+  return parentContainer[key];
+}
+
+function parseSimpleYamlDocument(content) {
+  const root = {};
+  const stack = [{ indent: -1, container: root, parent: null, key: '' }];
+
+  for (const rawLine of String(content ?? '').split(/\r?\n/)) {
+    const line = stripYamlLineComment(rawLine);
+    if (!line.trim() || line.trim() === '---') {
+      continue;
+    }
+
+    const listMatch = line.match(/^(\s*)-\s*(.*?)\s*$/);
+    if (listMatch) {
+      const indent = listMatch[1].length;
+      while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
+        stack.pop();
+      }
+
+      const frame = stack[stack.length - 1];
+      if (!Array.isArray(frame.container)) {
+        if (frame.parent && isPlainObject(frame.container) && Object.keys(frame.container).length === 0) {
+          frame.container = [];
+          frame.parent.container[frame.key] = frame.container;
+        } else {
+          continue;
+        }
+      }
+
+      const value = parseSimpleYamlScalar(listMatch[2]);
+      frame.container.push(value);
+      continue;
+    }
+
+    const mappingMatch = line.match(/^(\s*)([A-Za-z0-9_.-]+)\s*:\s*(.*?)\s*$/);
+    if (!mappingMatch) {
+      continue;
+    }
+
+    const indent = mappingMatch[1].length;
+    const key = mappingMatch[2];
+    const rawValue = mappingMatch[3];
+    while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
+      stack.pop();
+    }
+
+    const parentFrame = stack[stack.length - 1];
+    if (rawValue) {
+      assignYamlChild(parentFrame.container, key, parseSimpleYamlScalar(rawValue));
+      continue;
+    }
+
+    const container = assignYamlChild(parentFrame.container, key, {});
+    stack.push({ indent, container, parent: parentFrame, key });
+  }
+
+  return root;
+}
+
+function mergeSimpleYamlValue(baseValue, overrideValue) {
+  if (isPlainObject(baseValue) && isPlainObject(overrideValue)) {
+    const merged = { ...baseValue };
+    for (const [key, value] of Object.entries(overrideValue)) {
+      merged[key] = mergeSimpleYamlValue(merged[key], value);
+    }
+    return merged;
+  }
+
+  return overrideValue;
+}
+
+function mergeSimpleYamlDocuments(documents = []) {
+  return documents.reduce(
+    (merged, document) => mergeSimpleYamlValue(merged, parseSimpleYamlDocument(document)),
+    {},
+  );
+}
+
+function removeSimpleYamlObjectPath(target, keyPath) {
+  if (!isPlainObject(target) || keyPath.length === 0) {
+    return;
+  }
+
+  const ancestors = [];
+  let cursor = target;
+  for (const key of keyPath.slice(0, -1)) {
+    if (!isPlainObject(cursor[key])) {
+      return;
+    }
+
+    ancestors.push({ parent: cursor, key });
+    cursor = cursor[key];
+  }
+
+  delete cursor[keyPath[keyPath.length - 1]];
+
+  for (let index = ancestors.length - 1; index >= 0; index -= 1) {
+    const { parent, key } = ancestors[index];
+    if (!isPlainObject(parent[key]) || Object.keys(parent[key]).length > 0) {
+      break;
+    }
+
+    delete parent[key];
+  }
+}
+
+function formatSimpleYamlScalar(value) {
+  const stringValue = String(value ?? '');
+  if (!stringValue) {
+    return "''";
+  }
+
+  if (
+    /^[*![\]{}&,#%@`|>]/.test(stringValue) ||
+    /\s+#/.test(stringValue) ||
+    /:\s/.test(stringValue) ||
+    stringValue === '-' ||
+    stringValue === '~'
+  ) {
+    return `"${stringValue.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  }
+
+  return stringValue;
+}
+
+function stringifySimpleYamlValue(value, indent = 0) {
+  const spaces = ' '.repeat(indent);
+  if (Array.isArray(value)) {
+    return value
+      .map((item) =>
+        isPlainObject(item)
+          ? `${spaces}-\n${stringifySimpleYamlValue(item, indent + 2)}`
+          : `${spaces}- ${formatSimpleYamlScalar(item)}`,
+      )
+      .join('\n');
+  }
+
+  if (!isPlainObject(value)) {
+    return `${spaces}${formatSimpleYamlScalar(value)}`;
+  }
+
+  return Object.entries(value)
+    .map(([key, childValue]) => {
+      if (isPlainObject(childValue) || Array.isArray(childValue)) {
+        return `${spaces}${key}:\n${stringifySimpleYamlValue(childValue, indent + 2)}`;
+      }
+      return `${spaces}${key}: ${formatSimpleYamlScalar(childValue)}`;
+    })
+    .join('\n');
+}
+
+export function mergeYamlConfigContents(configContents = []) {
+  const nonEmptyContents = configContents
+    .map((content) => String(content ?? '').trim())
+    .filter(Boolean);
+  if (nonEmptyContents.length === 0) {
+    return '';
+  }
+
+  const mergedConfig = mergeSimpleYamlDocuments(nonEmptyContents);
+  if (Object.keys(mergedConfig).length === 0) {
+    return sanitizeProfileSpecificConfigContent(nonEmptyContents.join('\n\n'));
+  }
+
+  removeSimpleYamlObjectPath(mergedConfig, PROFILE_ACTIVATION_PATH);
+  removeSimpleYamlObjectPath(mergedConfig, [PROFILE_ACTIVATION_DOTTED_PATH]);
+
+  return `${stringifySimpleYamlValue(mergedConfig)}\n`;
+}
+
+function removeYamlScalarPath(content, keyPath) {
+  const dottedPath = keyPath.join('.');
+  const lines = String(content ?? '').split(/\r?\n/);
+  let removed = false;
+
+  while (true) {
+    const entries = enumerateYamlScalarLines(lines.join('\n'));
+    const targetEntry = entries
+      .filter((entry) => !entry.isParent && (entry.dottedPath === dottedPath || entry.key === dottedPath))
+      .at(-1);
+
+    if (!targetEntry) {
+      break;
+    }
+
+    lines.splice(targetEntry.index, 1);
+    removed = true;
+
+    for (let parentLength = keyPath.length - 1; parentLength > 0; parentLength -= 1) {
+      const parentPath = keyPath.slice(0, parentLength);
+      const parentDottedPath = parentPath.join('.');
+      const updatedEntries = enumerateYamlScalarLines(lines.join('\n'));
+      const parentEntry = updatedEntries
+        .filter((entry) => entry.isParent && (entry.dottedPath === parentDottedPath || entry.key === parentDottedPath))
+        .at(-1);
+
+      if (!parentEntry) {
+        continue;
+      }
+
+      const hasChildEntry = updatedEntries.some((entry) =>
+        entry.index > parentEntry.index &&
+        entry.indent > parentEntry.indent &&
+        entry.dottedPath.startsWith(`${parentDottedPath}.`),
+      );
+      if (hasChildEntry) {
+        break;
+      }
+
+      lines.splice(parentEntry.index, 1);
+    }
+  }
+
+  return removed ? lines.join('\n') : String(content ?? '');
+}
+
+function removePropertiesScalar(content, dottedPath) {
+  const escapedPath = dottedPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const propertyPattern = new RegExp(`^\\s*${escapedPath}\\s*[=:]`);
+  let removed = false;
+
+  const nextContent = String(content ?? '')
+    .split(/\r?\n/)
+    .filter((line) => {
+      const shouldRemove = propertyPattern.test(line);
+      removed = removed || shouldRemove;
+      return !shouldRemove;
+    })
+    .join('\n');
+
+  return removed ? nextContent : String(content ?? '');
+}
+
+export function sanitizeProfileSpecificConfigContent(content) {
+  const withoutNestedYaml = removeYamlScalarPath(content, PROFILE_ACTIVATION_PATH);
+  const withoutDottedYaml = removeYamlScalarPath(withoutNestedYaml, [PROFILE_ACTIVATION_DOTTED_PATH]);
+
+  return removePropertiesScalar(withoutDottedYaml, PROFILE_ACTIVATION_DOTTED_PATH);
+}
+
 function getYamlMappingEntry(content, keyPath) {
   const dottedPath = keyPath.join('.');
   return enumerateYamlScalarLines(content)
@@ -532,30 +842,9 @@ export function collectRuntimeEnvironmentJson(content, ports) {
 }
 
 export function buildRuntimeOverrideYaml(content, ports) {
-  const fields = [];
-  const addScalarProperty = (keyPath) => {
-    const value = getYamlScalarValue(content, keyPath);
-    if (!String(value ?? '').trim()) {
-      return;
-    }
-
-    fields.push({ path: keyPath, value });
-  };
-
-  addScalarProperty(SERVER_PORT_PATH);
-  for (const group of COMMON_ENVIRONMENT_CONFIG_GROUPS) {
-    for (const field of group.fields) {
-      addScalarProperty(field.path);
-    }
-  }
-  for (const datasourceGroup of detectDatasourceGroups(content)) {
-    for (const field of datasourceGroup.fields) {
-      addScalarProperty(field.path);
-    }
-  }
-
+  const sanitizedContent = sanitizeProfileSpecificConfigContent(content);
   const serverPort = ports?.server ? String(ports.server) : getYamlScalarValue(content, SERVER_PORT_PATH);
-  const uniqueFields = new Map(fields.map((field) => [field.path.join('.'), field]));
+  const uniqueFields = new Map();
   if (serverPort) {
     uniqueFields.set(SERVER_PORT_PATH.join('.'), {
       path: SERVER_PORT_PATH,
@@ -567,7 +856,7 @@ export function buildRuntimeOverrideYaml(content, ports) {
     value: 'false',
   });
 
-  return applyEnvironmentConfigFields('', Array.from(uniqueFields.values()));
+  return applyEnvironmentConfigFields(sanitizedContent, Array.from(uniqueFields.values()));
 }
 
 export function collectSafeRuntimeArguments(ports, runtimeOverride = null) {

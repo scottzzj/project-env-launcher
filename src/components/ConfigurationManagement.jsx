@@ -1,26 +1,6 @@
 import { FileCog, RefreshCw, Save, Server } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-function cloneEditableGroups(groups = []) {
-  return groups.map((group) => ({
-    ...group,
-    fields: (group.fields ?? []).map((field) => ({ ...field })),
-  }));
-}
-
-function flattenFields(groups = []) {
-  return groups.flatMap((group) =>
-    (group.fields ?? []).map((field) => ({
-      path: field.path,
-      value: field.value ?? '',
-    })),
-  );
-}
-
-function isStartupGroup(group) {
-  return group.groupKey === 'startup-nacos';
-}
-
 function getDefaultProject(projects = [], modules = []) {
   const firstProjectWithModules = projects.find((project) =>
     modules.some(
@@ -48,7 +28,6 @@ function ConfigurationManagement({
   const [environmentCode, setEnvironmentCode] = useState('');
   const [moduleId, setModuleId] = useState('');
   const [content, setContent] = useState('');
-  const [editableGroups, setEditableGroups] = useState([]);
   const [notice, setNotice] = useState('');
 
   const selectedProject = useMemo(
@@ -77,8 +56,7 @@ function ConfigurationManagement({
     environmentConfig?.project?.id === selectedProject?.id &&
     environmentConfig?.module?.id === selectedModule?.id &&
     environmentConfig?.environment?.code === selectedEnvironment?.code;
-  const hasEditableFields = editableGroups.some((group) => group.fields?.length > 0);
-  const canSaveConfig = isLoadedSelection && (content.trim() || hasEditableFields);
+  const canSaveConfig = isLoadedSelection && content.trim();
 
   useEffect(() => {
     setEnvironmentCode((currentCode) =>
@@ -115,29 +93,11 @@ function ConfigurationManagement({
   useEffect(() => {
     if (isLoadedSelection) {
       setContent(environmentConfig?.config?.content ?? '');
-      setEditableGroups(cloneEditableGroups(environmentConfig?.config?.editableGroups ?? []));
       return;
     }
 
     setContent('');
-    setEditableGroups([]);
   }, [environmentConfig?.config?.hash, isLoadedSelection]);
-
-  function updateEditableField(groupKey, fieldPath, value) {
-    const pathKey = fieldPath.join('.');
-    setEditableGroups((currentGroups) =>
-      currentGroups.map((group) =>
-        group.groupKey === groupKey
-          ? {
-              ...group,
-              fields: group.fields.map((field) =>
-                field.path.join('.') === pathKey ? { ...field, value } : field,
-              ),
-            }
-          : group,
-      ),
-    );
-  }
 
   async function handleReloadConfig() {
     if (!selectedProject || !selectedEnvironment || !selectedModule || !onLoadEnvironmentConfig) {
@@ -149,7 +109,7 @@ function ConfigurationManagement({
       await onLoadEnvironmentConfig(selectedProject.id, selectedModule.id, selectedEnvironment.code, {
         source: 'default',
       });
-      setNotice('已从项目默认配置重新获取，保存后才会写入当前环境和模块的数据库配置。');
+      setNotice('已从项目默认配置重新获取，保存后会写入当前环境和模块的完整配置。');
     } catch (error) {
       setNotice(`获取默认配置失败：${error.message}`);
     }
@@ -166,7 +126,7 @@ function ConfigurationManagement({
         moduleId: selectedModule.id,
         environmentCode: selectedEnvironment.code,
         content,
-        fields: flattenFields(editableGroups),
+        fields: [],
       });
       setNotice(payload.config?.saved ? '已保存到数据库，不会影响其他环境或模块。' : '已保存配置。');
     } catch (error) {
@@ -198,7 +158,7 @@ function ConfigurationManagement({
         <div className="project-page-header">
           <div>
             <h2>配置管理</h2>
-            <p>选择环境和模块后，维护常用运行配置。</p>
+            <p>选择环境和模块后，维护完整运行配置。</p>
           </div>
         </div>
         <section className="config-detail-empty">
@@ -215,7 +175,7 @@ function ConfigurationManagement({
       <div className="project-page-header">
         <div>
           <h2>配置管理</h2>
-          <p>只维护 Nacos、RabbitMQ、Redis 和数据库这些常改配置。</p>
+          <p>按环境和模块维护完整 YAML 配置。</p>
         </div>
       </div>
 
@@ -254,7 +214,7 @@ function ConfigurationManagement({
         <section className="environment-config-panel config-yaml-panel" aria-label="模块环境配置">
           <div className="environment-config-header compact">
             <div>
-              <h3>配置项</h3>
+              <h3>完整配置</h3>
             </div>
             <div className="environment-config-header-actions">
               <button type="button" onClick={handleReloadConfig} disabled={isEnvironmentConfigBusy}>
@@ -274,42 +234,19 @@ function ConfigurationManagement({
 
           {isLoadedSelection ? (
             <>
-              {hasEditableFields ? (
-                <div className="environment-config-editor-grid">
-                  {editableGroups.map((group) => (
-                    <article
-                      className={`environment-config-form-card${isStartupGroup(group) ? ' runtime-card' : ''}`}
-                      key={group.groupKey}
-                    >
-                      <h4>{group.groupTitle}</h4>
-                      <div className="environment-field-grid">
-                        {group.fields.map((field) => (
-                          <label htmlFor={`${group.groupKey}-${field.path.join('-')}`} key={field.path.join('.')}>
-                            {field.label}
-                            <input
-                              id={`${group.groupKey}-${field.path.join('-')}`}
-                              value={field.value ?? ''}
-                              onChange={(event) =>
-                                updateEditableField(group.groupKey, field.path, event.target.value)
-                              }
-                              type={field.secret ? 'password' : 'text'}
-                              inputMode={field.path.join('.') === 'server.port' ? 'numeric' : undefined}
-                              autoComplete="off"
-                            />
-                          </label>
-                        ))}
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <div className="environment-config-empty compact">
-                  未识别到 Nacos、RabbitMQ、Redis 或数据库配置项。
-                </div>
-              )}
+              <label className="environment-yaml-editor" htmlFor="environment-yaml-content">
+                YAML
+                <textarea
+                  id="environment-yaml-content"
+                  value={content}
+                  onChange={(event) => setContent(event.target.value)}
+                  spellCheck={false}
+                  wrap="off"
+                />
+              </label>
 
               <div className="environment-config-actions">
-                {notice ? <span>{notice}</span> : <span>保存的是当前“环境 + 模块”的独立配置。</span>}
+                {notice ? <span>{notice}</span> : <span>保存的是当前“环境 + 模块”的完整独立配置。</span>}
               </div>
             </>
           ) : (
