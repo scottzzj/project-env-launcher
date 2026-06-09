@@ -28,7 +28,7 @@ test('buildRuntimeOverrideYaml keeps full YAML and applies runtime overrides', (
   assert.match(runtimeYaml, /host: 192\.168\.0\.64/);
   assert.match(runtimeYaml, /url: jdbc:mysql:\/\/ob-proxy\.read\.epean\.cn:2883\/trade_online/);
   assert.match(runtimeYaml, /port: 18681/);
-  assert.match(runtimeYaml, /register-enabled: false/);
+  assert.doesNotMatch(runtimeYaml, /register-enabled: false/);
 });
 
 test('selectEnvironmentProfileConfigNames only includes the requested profile and dev fallback', () => {

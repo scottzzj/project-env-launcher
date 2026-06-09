@@ -836,8 +836,6 @@ export function collectRuntimeEnvironmentJson(content, ports) {
   if (ports?.server) {
     setNestedJsonValue(runtimeJson, SERVER_PORT_PATH, String(ports.server));
   }
-  setNestedJsonValue(runtimeJson, ['spring', 'cloud', 'nacos', 'discovery', 'register-enabled'], 'false');
-
   return runtimeJson;
 }
 
@@ -851,11 +849,6 @@ export function buildRuntimeOverrideYaml(content, ports) {
       value: serverPort,
     });
   }
-  uniqueFields.set('spring.cloud.nacos.discovery.register-enabled', {
-    path: ['spring', 'cloud', 'nacos', 'discovery', 'register-enabled'],
-    value: 'false',
-  });
-
   return applyEnvironmentConfigFields(sanitizedContent, Array.from(uniqueFields.values()));
 }
 
@@ -863,7 +856,6 @@ export function collectSafeRuntimeArguments(ports, runtimeOverride = null) {
   return [
     ...(runtimeOverride?.fileUrl ? [`--spring.config.additional-location=${runtimeOverride.fileUrl}`] : []),
     `--server.port=${ports.server}`,
-    '--spring.cloud.nacos.discovery.register-enabled=false',
   ];
 }
 
