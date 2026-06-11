@@ -338,7 +338,9 @@ export function buildMavenStartCommand(project, moduleConfig, environment, ports
     '-Dmaven.test.skip=true',
     mavenRuntime.localRepository ? `-Dmaven.repo.local=${mavenRuntime.localRepository}` : '',
   ].filter(Boolean);
-  const dependencyBuildArgs = commandModuleSelector ? ['-pl', commandModuleSelector, '-am', 'install'] : [];
+  // Clean upstream modules before installing so deleted resources do not survive in target/classes
+  // and get repackaged into the local Maven repository.
+  const dependencyBuildArgs = commandModuleSelector ? ['-pl', commandModuleSelector, '-am', 'clean', 'install'] : [];
   const launchArgs = [
     commandModuleSelector ? `-f=${path.join(mavenRuntime.cwd, 'pom.xml')}` : '',
     'spring-boot:run',

@@ -28,3 +28,9 @@ test('buildMavenStartCommand does not force disable Nacos registration', () => {
 
   assert.doesNotMatch(command.command, /spring\.cloud\.nacos\.discovery\.register-enabled=false/);
 });
+
+test('buildMavenStartCommand cleans reactor modules before install', () => {
+  const command = buildMavenStartCommand(project, moduleConfig, environment, ports, mavenRuntime);
+
+  assert.match(command.command, /-pl trade-gateway -am clean install && mvn\.cmd/);
+});
