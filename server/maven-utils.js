@@ -319,12 +319,126 @@ function formatCommandArg(value) {
   return /\s/.test(text) ? `"${text.replace(/"/g, '\\"')}"` : text;
 }
 
-export function buildMavenStartCommand(project, moduleConfig, environment, ports, mavenRuntime, runtimeOverride = null) {
+function buildMavenProcessStep(commandName, displayName, cwd, args, environmentVariables = {}) {
+  return {
+    cwd,
+    executable: process.platform === 'win32' ? 'cmd.exe' : commandName,
+    args: process.platform === 'win32'
+      ? ['/d', '/c', 'call', commandName, ...args]
+      : args,
+    command: `${displayName} ${args.map(formatCommandArg).join(' ')}`,
+    environmentVariables,
+  };
+}
+
+function getMavenBaseArgs(mavenRuntime) {
+  return [
+    '-ntp',
+    '-DskipTests',
+    '-Dmaven.test.skip=true',
+    mavenRuntime.localRepository ? `-Dmaven.repo.local=${mavenRuntime.localRepository}` : '',
+  ].filter(Boolean);
+}
+
+export function buildMavenDependencyBuildStep(mavenRuntime, moduleSelectors = []) {
+  const commandRoot = mavenRuntime.commandRoot ?? mavenRuntime.projectRoot ?? mavenRuntime.cwd;
+  const displayName = mavenRuntime.displayName ?? mavenRuntime.commandName;
+  const normalizedCommandRoot = normalizeComparablePath(commandRoot);
+  const normalizedLocalRepository = normalizeComparablePath(mavenRuntime.localRepository ?? '');
+  const selectors = Array.from(
+    new Set(
+      moduleSelectors
+        .map((selector) => String(selector ?? '').trim())
+        .filter(Boolean),
+    ),
+  );
+
+  const args = [
+    ...getMavenBaseArgs(mavenRuntime),
+    ...(selectors.length > 0 ? ['-pl', selectors.join(','), '-am'] : []),
+    'clean',
+    'install',
+  ];
+
+  return {
+    ...buildMavenProcessStep(mavenRuntime.commandName, displayName, commandRoot, args),
+    lockKey: normalizedLocalRepository ? `maven-repository:${normalizedLocalRepository}` : `maven-root:${normalizedCommandRoot}`,
+    lockLabel: mavenRuntime.localRepository || commandRoot,
+    mergeKey: [
+      normalizedCommandRoot,
+      normalizeComparablePath(mavenRuntime.commandName),
+      normalizedLocalRepository,
+    ].join('|'),
+    moduleSelectors: selectors,
+    buildsProjectRoot: selectors.length === 0,
+  };
+}
+
+export function mergeMavenDependencyBuildSteps(steps = []) {
+  const validSteps = steps.filter(Boolean);
+  if (validSteps.length === 0) {
+    return null;
+  }
+
+  const [firstStep] = validSteps;
+  const canMerge = validSteps.every(
+    (step) =>
+      step.mergeKey
+        ? step.mergeKey === firstStep.mergeKey
+        : step.cwd === firstStep.cwd && step.executable === firstStep.executable,
+  );
+  if (!canMerge) {
+    return null;
+  }
+
+  const projectRootBuildStep = validSteps.find((step) => step.buildsProjectRoot);
+  if (projectRootBuildStep) {
+    return projectRootBuildStep;
+  }
+
+  const moduleSelectors = Array.from(
+    new Set(validSteps.flatMap((step) => step.moduleSelectors ?? []).filter(Boolean)),
+  );
+  if (moduleSelectors.length === 0) {
+    return null;
+  }
+
+  const selectorIndex = firstStep.args.indexOf('-pl');
+  if (selectorIndex < 0 || selectorIndex + 1 >= firstStep.args.length) {
+    return null;
+  }
+
+  const args = [...firstStep.args];
+  args[selectorIndex + 1] = moduleSelectors.join(',');
+  const displayCommand = firstStep.command.replace(
+    /-pl\s+\S+\s+-am\s+clean\s+install/,
+    `-pl ${moduleSelectors.join(',')} -am clean install`,
+  );
+
+  return {
+    ...firstStep,
+    args,
+    command: displayCommand,
+    moduleSelectors,
+  };
+}
+
+export function buildMavenStartCommand(
+  project,
+  moduleConfig,
+  environment,
+  ports,
+  mavenRuntime,
+  runtimeOverride = null,
+  options = {},
+) {
   const profile = environment.profile ?? environment.code;
+  const displayName = mavenRuntime.displayName ?? mavenRuntime.commandName;
   const commandRoot = mavenRuntime.commandRoot ?? mavenRuntime.projectRoot ?? mavenRuntime.cwd;
   const commandModuleSelector =
     mavenRuntime.commandModuleSelector ||
     path.relative(commandRoot, mavenRuntime.cwd).replace(/[\\/]+/g, '/');
+  const skipDependencyBuild = Boolean(options.skipDependencyBuild);
   const springBootArguments = [
     ...collectSafeRuntimeArguments(ports, runtimeOverride),
     ...Object.entries(ports)
@@ -332,15 +446,17 @@ export function buildMavenStartCommand(project, moduleConfig, environment, ports
       .map(([key, value]) => `--${key}=${value}`),
   ];
   const springApplicationJson = JSON.stringify(collectRuntimeEnvironmentJson(runtimeOverride?.content ?? '', ports));
-  const baseMavenArgs = [
-    '-ntp',
-    '-DskipTests',
-    '-Dmaven.test.skip=true',
-    mavenRuntime.localRepository ? `-Dmaven.repo.local=${mavenRuntime.localRepository}` : '',
-  ].filter(Boolean);
+  const baseMavenArgs = getMavenBaseArgs(mavenRuntime);
   // Clean upstream modules before installing so deleted resources do not survive in target/classes
   // and get repackaged into the local Maven repository.
-  const dependencyBuildArgs = commandModuleSelector ? ['-pl', commandModuleSelector, '-am', 'clean', 'install'] : [];
+  const dependencyBuildStep = buildMavenDependencyBuildStep(mavenRuntime, [commandModuleSelector]);
+  const dependencyBuildArgs = dependencyBuildStep && !skipDependencyBuild
+    ? [
+        ...(commandModuleSelector ? ['-pl', commandModuleSelector, '-am'] : []),
+        'clean',
+        'install',
+      ]
+    : [];
   const launchArgs = [
     commandModuleSelector ? `-f=${path.join(mavenRuntime.cwd, 'pom.xml')}` : '',
     'spring-boot:run',
@@ -362,10 +478,20 @@ export function buildMavenStartCommand(project, moduleConfig, environment, ports
     args: process.platform === 'win32'
       ? ['/d', '/c', 'call', mavenRuntime.commandName, ...mavenArgs]
       : mavenArgs,
-    command: `${mavenRuntime.displayName} ${mavenArgs.map(formatCommandArg).join(' ')}`,
+    command: `${displayName} ${mavenArgs.map(formatCommandArg).join(' ')}`,
     localRepository: mavenRuntime.localRepository,
     profile,
     runtimeConfigPath: runtimeOverride?.filePath ?? '',
+    dependencyBuildStep,
+    launchStep: buildMavenProcessStep(
+      mavenRuntime.commandName,
+      displayName,
+      commandRoot,
+      [...baseMavenArgs, ...launchArgs],
+      {
+        SPRING_APPLICATION_JSON: springApplicationJson,
+      },
+    ),
     environmentVariables: {
       SPRING_APPLICATION_JSON: springApplicationJson,
     },

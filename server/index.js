@@ -37,7 +37,7 @@ import {
   summarizeEnvironmentConfig,
 } from './environment-config-utils.js';
 import { decodeRouteParam, fileExists } from './filesystem-utils.js';
-import { buildMavenStartCommand, resolveMavenRuntime } from './maven-utils.js';
+import { buildMavenStartCommand, mergeMavenDependencyBuildSteps, resolveMavenRuntime } from './maven-utils.js';
 import { readModuleConfigPort, readModuleEntries, readModuleExtraPorts, readPomArtifactId } from './project-module-utils.js';
 import { sendJson, sendSseEvent, readJson, writeSseHeaders } from './http-utils.js';
 import { serveStaticFile } from './static-server.js';
@@ -51,6 +51,8 @@ const PROJECT_ACCENTS = ['blue', 'green', 'amber', 'violet', 'red'];
 const ACTIVE_RUN_STATUSES = new Set(['starting', 'running']);
 const MAX_LOG_PREVIEW_LENGTH = 4000;
 const MAX_SSE_LOG_SNAPSHOT_LENGTH = 60000;
+const MODULE_START_SEQUENCE_TIMEOUT_MS = Number(process.env.MODULE_START_SEQUENCE_TIMEOUT_MS ?? 120000);
+const MODULE_START_SEQUENCE_POLL_INTERVAL_MS = 1500;
 const UTF8_PROCESS_LOG_DECODER = new TextDecoder('utf-8', { fatal: true });
 const GB18030_PROCESS_LOG_DECODER = new TextDecoder('gb18030');
 
@@ -64,6 +66,7 @@ let autoRefresh = true;
 let projectWorkspaceMeta = new Map();
 const managedProcesses = new Map();
 const logSubscribers = new Map();
+const mavenDependencyBuildQueues = new Map();
 
 function getProject(id) {
   return projects.find((project) => project.id === id);
@@ -1493,6 +1496,82 @@ function notifyRunRecordSubscribers(recordId, event, payload) {
   }
 }
 
+function buildChildProcessEnv(environmentVariables = {}) {
+  return {
+    ...process.env,
+    ...environmentVariables,
+    JAVA_TOOL_OPTIONS: [process.env.JAVA_TOOL_OPTIONS, '-Dfile.encoding=UTF-8']
+      .filter(Boolean)
+      .join(' '),
+  };
+}
+
+function runMavenProcessStep(step, writeOutput) {
+  return new Promise((resolve) => {
+    let child = null;
+    let outputBuffer = '';
+    const appendText = (text) => {
+      if (!text) {
+        return;
+      }
+
+      outputBuffer = `${outputBuffer}${text}`.slice(-MAX_LOG_PREVIEW_LENGTH);
+      writeOutput?.(text);
+    };
+    const appendChunk = (chunk) => {
+      appendText(decodeProcessLogLine(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+    };
+
+    try {
+      child = spawn(step.executable, step.args, {
+        cwd: step.cwd,
+        detached: false,
+        env: buildChildProcessEnv(step.environmentVariables),
+        windowsHide: true,
+        shell: false,
+      });
+    } catch (error) {
+      resolve({ ok: false, code: null, output: outputBuffer, message: error.message });
+      return;
+    }
+
+    child.stdout?.on('data', appendChunk);
+    child.stderr?.on('data', appendChunk);
+    child.once('error', (error) => {
+      resolve({ ok: false, code: null, output: outputBuffer, message: error.message });
+    });
+    child.once('exit', (code) => {
+      resolve({
+        ok: code === 0,
+        code,
+        output: outputBuffer,
+        message: code === 0 ? '' : `Maven 构建失败，退出码：${code ?? '未知'}`,
+      });
+    });
+  });
+}
+
+async function enqueueMavenDependencyBuild(step, writeOutput) {
+  if (!step) {
+    return { ok: true, code: 0, output: '', message: '' };
+  }
+
+  const lockKey = step.lockKey || normalizeComparablePath(step.cwd);
+  const previousQueue = mavenDependencyBuildQueues.get(lockKey) ?? Promise.resolve();
+  const currentQueue = previousQueue
+    .catch(() => {})
+    .then(() => runMavenProcessStep(step, writeOutput));
+  const trackedQueue = currentQueue.finally(() => {
+    if (mavenDependencyBuildQueues.get(lockKey) === trackedQueue) {
+      mavenDependencyBuildQueues.delete(lockKey);
+    }
+  });
+
+  mavenDependencyBuildQueues.set(lockKey, trackedQueue);
+
+  return currentQueue;
+}
+
 async function streamRunRecordLogs(recordId, req, res) {
   const record = getRunRecord(recordId);
   if (!record) {
@@ -1557,7 +1636,7 @@ async function streamRunRecordLogs(recordId, req, res) {
   });
 }
 
-async function startProjectModuleRecord(project, moduleConfig, environment) {
+async function startProjectModuleRecord(project, moduleConfig, environment, options = {}) {
   const runtime = buildProjectRuntime(project);
   if (!runtime.pathExists) {
     return {
@@ -1649,6 +1728,9 @@ async function startProjectModuleRecord(project, moduleConfig, environment) {
     allocation.ports,
     mavenRuntime,
     runtimeOverride,
+    {
+      skipDependencyBuild: Boolean(options.skipDependencyBuild),
+    },
   );
   const recordId = `${project.id}:${moduleConfig.id}:${environment.code}`;
   const existingManagedProcess = managedProcesses.get(recordId);
@@ -1707,17 +1789,14 @@ async function startProjectModuleRecord(project, moduleConfig, environment) {
   ].join('\n'));
 
   let child = null;
+  const processStep = options.skipDependencyBuild && startCommand.launchStep
+    ? startCommand.launchStep
+    : startCommand;
   try {
-    child = spawn(startCommand.executable, startCommand.args, {
-      cwd: startCommand.cwd,
+    child = spawn(processStep.executable, processStep.args, {
+      cwd: processStep.cwd,
       detached: false,
-      env: {
-        ...process.env,
-        ...startCommand.environmentVariables,
-        JAVA_TOOL_OPTIONS: [process.env.JAVA_TOOL_OPTIONS, '-Dfile.encoding=UTF-8']
-          .filter(Boolean)
-          .join(' '),
-      },
+      env: buildChildProcessEnv(processStep.environmentVariables),
       windowsHide: true,
       shell: false,
     });
@@ -1871,6 +1950,223 @@ async function startProjectModuleRecord(project, moduleConfig, environment) {
     command: startCommand,
     record: publicRunRecord(record),
   };
+}
+
+async function prepareProjectModuleStart(project, moduleConfig, environment) {
+  const runtime = buildProjectRuntime(project);
+  if (!runtime.pathExists) {
+    return {
+      ok: false,
+      module: moduleConfig,
+      environment,
+      message: '项目路径不存在，不能启动模块',
+    };
+  }
+
+  const portConfig = await resolveModuleStartPorts(project, moduleConfig, environment);
+  if (!portConfig.serverPort) {
+    return {
+      ok: false,
+      module: moduleConfig,
+      environment,
+      message: '请先在配置管理中设置当前环境和模块的启动端口',
+    };
+  }
+
+  const allocation = allocateRuntimeModulePorts(project.id, moduleConfig, portConfig.serverPort, environment.code);
+  if (allocation.status === 'already-running') {
+    const record = runRecords.find(
+      (item) =>
+        item.projectId === project.id &&
+        item.moduleId === moduleConfig.id &&
+        normalizeEnvironmentCode(item.environmentCode) === normalizeEnvironmentCode(environment.code) &&
+        ACTIVE_RUN_STATUSES.has(item.status),
+    );
+    return {
+      ok: true,
+      alreadyRunning: true,
+      module: moduleConfig,
+      environment,
+      allocation,
+      command: record ? { cwd: record.cwd, command: record.command } : null,
+      message: '模块已经在启动或运行中',
+      record: publicRunRecord(record),
+    };
+  }
+
+  const mavenRuntime = await resolveMavenRuntime(project, moduleConfig);
+  if (!mavenRuntime) {
+    return {
+      ok: false,
+      module: moduleConfig,
+      environment,
+      allocation,
+      message: '未找到 Maven。请安装 Maven 并把 mvn 加入 PATH，或在项目根目录放置 mvnw.cmd。',
+    };
+  }
+
+  const previewCommand = buildMavenStartCommand(project, moduleConfig, environment, allocation.ports, mavenRuntime);
+  return {
+    ok: true,
+    module: moduleConfig,
+    environment,
+    allocation,
+    dependencyBuildStep: previewCommand.dependencyBuildStep,
+  };
+}
+
+async function createDependencyBuildFailureRecord(project, moduleConfig, environment, preparation, buildStep, buildResult) {
+  const recordId = `${project.id}:${moduleConfig.id}:${environment.code}`;
+  const logFilePath = buildRunLogFilePath(recordId);
+  const lastOutput = buildResult.output || buildResult.message || '依赖构建失败';
+  const record = {
+    id: recordId,
+    projectId: project.id,
+    projectName: project.name,
+    moduleId: moduleConfig.id,
+    moduleName: moduleConfig.name,
+    environmentCode: environment.code,
+    environmentName: environment.name,
+    branch: environment.code,
+    branchName: environment.name,
+    status: 'failed',
+    statusText: '构建失败',
+    ports: preparation?.allocation?.ports ?? {},
+    conflictHandled: preparation?.allocation?.conflict ?? false,
+    command: buildStep.command,
+    cwd: buildStep.cwd,
+    startedAt: formatTime(new Date()),
+    endedAt: formatTime(new Date()),
+    processId: null,
+    exitCode: buildResult.code,
+    lastOutput,
+    logFilePath,
+  };
+  upsertRunRecord(record);
+  await mkdir(path.dirname(logFilePath), { recursive: true });
+  await writeFile(logFilePath, [
+    `启动时间：${record.startedAt}`,
+    `项目：${project.name}`,
+    `环境：${environment.name}`,
+    `模块：${moduleConfig.name}`,
+    `目录：${buildStep.cwd}`,
+    `命令：${buildStep.command}`,
+    '',
+    lastOutput,
+    '',
+    `依赖构建失败：${buildResult.message || `退出码 ${buildResult.code ?? '未知'}`}`,
+    '',
+  ].join('\n'), { encoding: 'utf8' });
+  notifyRunRecordSubscribers(record.id, 'record', { record: publicRunRecord(record) });
+  return record;
+}
+
+async function waitForModuleStartToSettle(recordId) {
+  const timeoutAt = Date.now() + MODULE_START_SEQUENCE_TIMEOUT_MS;
+  while (Date.now() < timeoutAt) {
+    const record = getRunRecord(recordId);
+    if (!record || record.status !== 'starting') {
+      return record;
+    }
+
+    await wait(MODULE_START_SEQUENCE_POLL_INTERVAL_MS);
+  }
+
+  return getRunRecord(recordId);
+}
+
+async function startPreparedProjectModules(project, preparedStarts, results = []) {
+  const buildSucceededStarts = [];
+  if (preparedStarts.length === 0) {
+    return results;
+  }
+
+  const mergedBuildStep = mergeMavenDependencyBuildSteps(
+    preparedStarts.map(({ preparation }) => preparation.dependencyBuildStep),
+  );
+  if (!mergedBuildStep) {
+    const buildResult = {
+      ok: false,
+      code: null,
+      output: '',
+      message: '本次选择的模块无法合并为一次 Maven clean install，请确认它们属于同一个 Maven 根项目和本地仓库。',
+    };
+    // Batch startup must build the selected module set once; never fall back to per-module clean.
+    for (const { moduleConfig, environment, preparation } of preparedStarts) {
+      const buildStep = preparation.dependencyBuildStep ?? {
+        command: 'mvn clean install',
+        cwd: project.path,
+      };
+      const record = await createDependencyBuildFailureRecord(
+        project,
+        moduleConfig,
+        environment,
+        preparation,
+        buildStep,
+        buildResult,
+      );
+      results.push({
+        ok: false,
+        module: moduleConfig,
+        environment,
+        allocation: preparation.allocation,
+        command: buildStep,
+        message: buildResult.message,
+        record: publicRunRecord(record),
+      });
+    }
+    return results;
+  }
+
+  let buildOutput = '';
+  const buildResult = await enqueueMavenDependencyBuild(mergedBuildStep, (text) => {
+    buildOutput = `${buildOutput}${text}`.slice(-MAX_LOG_PREVIEW_LENGTH);
+  });
+  buildResult.output = buildOutput || buildResult.output;
+
+  if (buildResult.ok) {
+    buildSucceededStarts.push(...preparedStarts.map((preparedStart) => ({
+      ...preparedStart,
+      skipDependencyBuild: true,
+    })));
+  } else {
+    for (const { moduleConfig, environment, preparation } of preparedStarts) {
+      const record = await createDependencyBuildFailureRecord(
+        project,
+        moduleConfig,
+        environment,
+        preparation,
+        mergedBuildStep,
+        buildResult,
+      );
+      results.push({
+        ok: false,
+        module: moduleConfig,
+        environment,
+        allocation: preparation.allocation,
+        command: mergedBuildStep,
+        message: buildResult.message || '依赖构建失败',
+        record: publicRunRecord(record),
+      });
+    }
+
+    return results;
+  }
+
+  for (const { moduleConfig, environment, skipDependencyBuild } of buildSucceededStarts) {
+    const result = await startProjectModuleRecord(project, moduleConfig, environment, {
+      skipDependencyBuild,
+    });
+    if (result.record?.id && result.record.status === 'starting') {
+      result.record = publicRunRecord(await waitForModuleStartToSettle(result.record.id));
+    }
+    results.push({
+      ...result,
+      environment,
+    });
+  }
+
+  return results;
 }
 
 async function stopProjectModuleRecords(project, moduleIds, environment) {
@@ -2613,6 +2909,7 @@ async function handleRequest(req, res) {
     }
 
     const results = [];
+    const preparedStarts = [];
     for (const { moduleId, environment } of targets) {
       const moduleConfig = findProjectModule(project.id, moduleId);
       if (!moduleConfig) {
@@ -2620,12 +2917,16 @@ async function handleRequest(req, res) {
         continue;
       }
 
-      const result = await startProjectModuleRecord(project, moduleConfig, environment);
-      results.push({
-        ...result,
-        environment,
-      });
+      const preparation = await prepareProjectModuleStart(project, moduleConfig, environment);
+      if (!preparation.ok || preparation.alreadyRunning) {
+        results.push({ ...preparation, environment });
+        continue;
+      }
+
+      preparedStarts.push({ moduleConfig, environment, preparation });
     }
+
+    await startPreparedProjectModules(project, preparedStarts, results);
 
     if (results.some((result) => result.ok)) {
       setUpdated();
@@ -2731,8 +3032,17 @@ async function handleRequest(req, res) {
       return;
     }
 
-    const result = await startProjectModuleRecord(project, moduleConfig, environment);
-    setUpdated();
+    const results = [];
+    const preparation = await prepareProjectModuleStart(project, moduleConfig, environment);
+    if (!preparation.ok || preparation.alreadyRunning) {
+      results.push({ ...preparation, environment });
+    } else {
+      await startPreparedProjectModules(project, [{ moduleConfig, environment, preparation }], results);
+    }
+    if (results.some((result) => result.ok)) {
+      setUpdated();
+    }
+    const result = results[0] ?? { ok: false, module: moduleConfig, environment };
 
     const responsePayload = await listPayload();
     sendJson(res, 200, {
