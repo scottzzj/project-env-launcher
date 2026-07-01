@@ -336,6 +336,7 @@ function getMavenBaseArgs(mavenRuntime) {
     '-ntp',
     '-DskipTests',
     '-Dmaven.test.skip=true',
+    '-Dmaven.source.skip=true',
     mavenRuntime.localRepository ? `-Dmaven.repo.local=${mavenRuntime.localRepository}` : '',
   ].filter(Boolean);
 }
@@ -355,6 +356,8 @@ export function buildMavenDependencyBuildStep(mavenRuntime, moduleSelectors = []
 
   const args = [
     ...getMavenBaseArgs(mavenRuntime),
+    '-T',
+    '1C',
     ...(selectors.length > 0 ? ['-pl', selectors.join(','), '-am'] : []),
     'clean',
     'install',
@@ -451,11 +454,7 @@ export function buildMavenStartCommand(
   // and get repackaged into the local Maven repository.
   const dependencyBuildStep = buildMavenDependencyBuildStep(mavenRuntime, [commandModuleSelector]);
   const dependencyBuildArgs = dependencyBuildStep && !skipDependencyBuild
-    ? [
-        ...(commandModuleSelector ? ['-pl', commandModuleSelector, '-am'] : []),
-        'clean',
-        'install',
-      ]
+    ? dependencyBuildStep.args
     : [];
   const launchArgs = [
     commandModuleSelector ? `-f=${path.join(mavenRuntime.cwd, 'pom.xml')}` : '',
@@ -464,7 +463,6 @@ export function buildMavenStartCommand(
     `-Dspring-boot.run.arguments=${springBootArguments.join(' ')}`,
   ].filter(Boolean);
   const mavenArgs = [
-    ...baseMavenArgs,
     ...dependencyBuildArgs,
     ...(dependencyBuildArgs.length ? ['&&', mavenRuntime.commandName] : []),
     ...baseMavenArgs,

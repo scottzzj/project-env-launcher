@@ -32,7 +32,8 @@ test('buildMavenStartCommand does not force disable Nacos registration', () => {
 test('buildMavenStartCommand cleans reactor modules before install', () => {
   const command = buildMavenStartCommand(project, moduleConfig, environment, ports, mavenRuntime);
 
-  assert.match(command.command, /-pl trade-gateway -am clean install && mvn\.cmd/);
+  assert.match(command.command, /-Dmaven\.source\.skip=true/);
+  assert.match(command.command, /-T 1C -pl trade-gateway -am clean install && mvn\.cmd/);
 });
 
 test('buildMavenStartCommand can skip dependency build after a shared batch build', () => {
@@ -42,6 +43,7 @@ test('buildMavenStartCommand can skip dependency build after a shared batch buil
 
   assert.doesNotMatch(command.command, /clean install/);
   assert.doesNotMatch(command.command, /&& mvn\.cmd/);
+  assert.doesNotMatch(command.command, /-T 1C/);
   assert.match(command.command, /mvn\.cmd -ntp .* -f=D:[/\\]repo[/\\]trade-gateway[/\\]pom\.xml spring-boot:run/);
 });
 
@@ -49,8 +51,9 @@ test('buildMavenStartCommand exposes dependency build step for batch startup', (
   const command = buildMavenStartCommand(project, moduleConfig, environment, ports, mavenRuntime);
 
   assert.equal(command.dependencyBuildStep.cwd, 'D:/repo');
-  assert.match(command.dependencyBuildStep.command, /mvn\.cmd -ntp .* -pl trade-gateway -am clean install/);
-  assert.deepEqual(command.dependencyBuildStep.args.slice(-5), ['-pl', 'trade-gateway', '-am', 'clean', 'install']);
+  assert.match(command.dependencyBuildStep.command, /mvn\.cmd -ntp .* -T 1C -pl trade-gateway -am clean install/);
+  assert.ok(command.dependencyBuildStep.args.includes('-Dmaven.source.skip=true'));
+  assert.deepEqual(command.dependencyBuildStep.args.slice(-7), ['-T', '1C', '-pl', 'trade-gateway', '-am', 'clean', 'install']);
 });
 
 test('mergeMavenDependencyBuildSteps combines module selectors for one shared clean install', () => {
@@ -90,9 +93,9 @@ test('buildMavenStartCommand cleans root Maven project when no module selector e
     },
   );
 
-  assert.match(command.command, /mvn\.cmd -ntp .* clean install && mvn\.cmd/);
+  assert.match(command.command, /mvn\.cmd -ntp .* -T 1C clean install && mvn\.cmd/);
   assert.doesNotMatch(command.dependencyBuildStep.command, /-pl/);
-  assert.deepEqual(command.dependencyBuildStep.args.slice(-2), ['clean', 'install']);
+  assert.deepEqual(command.dependencyBuildStep.args.slice(-4), ['-T', '1C', 'clean', 'install']);
   assert.equal(command.dependencyBuildStep.buildsProjectRoot, true);
 });
 
